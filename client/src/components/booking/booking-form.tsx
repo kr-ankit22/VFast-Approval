@@ -74,11 +74,25 @@ export default function BookingForm() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const res = await apiRequest("POST", "/api/bookings", data);
-      return await res.json();
+      console.log("Submitting booking data:", data);
+      try {
+        const res = await apiRequest("POST", "/api/bookings", data);
+        console.log("Booking API response status:", res.status);
+        const jsonData = await res.json();
+        console.log("Booking API response:", jsonData);
+        if (!res.ok) {
+          throw new Error(jsonData.message || "Failed to create booking");
+        }
+        return jsonData;
+      } catch (err) {
+        console.error("Error submitting booking:", err);
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Booking created successfully:", data);
       queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       toast({
         title: "Booking submitted",
         description: "Your booking request has been successfully submitted.",
@@ -87,9 +101,10 @@ export default function BookingForm() {
       navigate("/booking/history");
     },
     onError: (error: Error) => {
+      console.error("Booking creation error:", error);
       toast({
         title: "Failed to submit booking",
-        description: error.message,
+        description: error.message || "There was an error submitting your booking. Please try again.",
         variant: "destructive",
       });
     },

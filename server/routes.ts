@@ -85,6 +85,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new booking (Booking users)
   app.post("/api/bookings", checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      console.log("Creating booking with data:", req.body);
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
@@ -92,9 +97,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkOutDate: new Date(req.body.checkOutDate)
       });
       
+      console.log("Parsed booking data:", bookingData);
       const booking = await storage.createBooking(bookingData);
+      console.log("Created booking:", booking);
       res.status(201).json(booking);
     } catch (error) {
+      console.error("Booking creation error:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
