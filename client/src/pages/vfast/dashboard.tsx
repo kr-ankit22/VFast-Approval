@@ -33,6 +33,11 @@ import { Progress } from "@/components/ui/progress";
 export default function VFastDashboard() {
   const { user } = useAuth();
   
+  // Get all bookings to calculate allocation statistics correctly
+  const { data: allBookings = [], isLoading: isLoadingAllBookings } = useQuery<Booking[]>({
+    queryKey: ["/api/bookings"]
+  });
+  
   // Get approved bookings that need room allocation
   const { data: approvedBookings = [], isLoading: isLoadingBookings } = useQuery<Booking[]>({
     queryKey: ["/api/bookings/approved"]
@@ -48,11 +53,11 @@ export default function VFastDashboard() {
     queryKey: ["/api/rooms"]
   });
 
-  // Calculate allocation statistics
-  const pendingAllocation = approvedBookings.filter(b => b.status === BookingStatus.APPROVED).length;
-  const allocatedRooms = approvedBookings.filter(b => b.status === BookingStatus.ALLOCATED).length;
-  const totalRequests = pendingAllocation + allocatedRooms;
-  const allocationPercentage = totalRequests > 0 ? Math.round((allocatedRooms / totalRequests) * 100) : 0;
+  // Calculate allocation statistics - using allBookings to get accurate numbers
+  const pendingAllocation = allBookings.filter(b => b.status === BookingStatus.APPROVED).length;
+  const allocatedBookings = allBookings.filter(b => b.status === BookingStatus.ALLOCATED).length;
+  const totalRequests = pendingAllocation + allocatedBookings;
+  const allocationPercentage = totalRequests > 0 ? Math.round((allocatedBookings / totalRequests) * 100) : 0;
   
   // Room statistics by type
   const singleRooms = rooms.filter(r => r.type === RoomType.SINGLE);
@@ -112,7 +117,7 @@ export default function VFastDashboard() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{allocatedRooms}</div>
+            <div className="text-2xl font-bold">{allocatedBookings}</div>
             <p className="text-xs text-muted-foreground">Successfully allocated bookings</p>
           </CardContent>
         </Card>

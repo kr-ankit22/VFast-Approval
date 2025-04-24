@@ -167,6 +167,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get approved bookings (for VFast room allocation)
+  app.get("/api/bookings/approved", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookings = await storage.getBookingsByStatus(BookingStatus.APPROVED);
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch approved bookings" });
+    }
+  });
+  
+  // Get reconsideration requests (for VFast review)
+  app.get("/api/bookings/reconsideration", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      // For now, return an empty array as reconsideration feature is not fully implemented
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch reconsideration requests" });
+    }
+  });
+
   // Rooms API
   
   // Get all rooms
