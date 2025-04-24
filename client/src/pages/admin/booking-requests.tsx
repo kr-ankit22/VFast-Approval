@@ -54,8 +54,9 @@ export default function BookingRequests() {
       const res = await apiRequest("PATCH", `/api/bookings/${data.id}/status`, data);
       return await res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+    onSuccess: (updatedBooking) => {
+      // More aggressive cache invalidation to ensure UI updates
+      queryClient.invalidateQueries();
       
       toast({
         title: "Booking updated",
@@ -68,6 +69,12 @@ export default function BookingRequests() {
       setAdminNotes("");
       setIsApproveDialogOpen(false);
       setIsRejectDialogOpen(false);
+      
+      // Force refresh current tab by setting a slight delay
+      setTimeout(() => {
+        // This will trigger a re-filter of the bookings
+        setActiveTab(activeTab);
+      }, 100);
     },
     onError: (error: Error) => {
       toast({

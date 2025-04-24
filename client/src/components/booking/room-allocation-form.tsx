@@ -77,8 +77,8 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms/available'] });
+      // Aggressively invalidate all queries to ensure fresh state
+      queryClient.invalidateQueries();
       
       toast({
         title: "Room Allocated",
@@ -86,7 +86,10 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
         variant: "default",
       });
       
-      if (onSuccess) onSuccess();
+      // Use a short delay to ensure UI has time to update
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
