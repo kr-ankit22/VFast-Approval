@@ -49,7 +49,7 @@ export default function RoomAllocationPage() {
       filtered = filtered.filter(booking => 
         booking.id.toString().includes(searchLower) ||
         booking.purpose.toLowerCase().includes(searchLower) ||
-        booking.roomPreference.toLowerCase().includes(searchLower)
+        booking.referringDepartment.toLowerCase().includes(searchLower)
       );
     }
     
@@ -63,8 +63,8 @@ export default function RoomAllocationPage() {
         // In a real app, you might have a specific priority field
         filtered.sort((a, b) => b.guestCount - a.guestCount);
         break;
-      case "room":
-        filtered.sort((a, b) => a.roomPreference.localeCompare(b.roomPreference));
+      case "department":
+        filtered.sort((a, b) => a.referringDepartment.localeCompare(b.referringDepartment));
         break;
       default:
         // Default is sorting by date
@@ -88,15 +88,7 @@ export default function RoomAllocationPage() {
     setSelectedBooking(null);
   };
 
-  // Get room type display name
-  const getRoomTypeDisplay = (type: string) => {
-    const types: Record<string, string> = {
-      "single": "Single Room",
-      "double": "Double Room",
-      "deluxe": "Deluxe Room",
-    };
-    return types[type] || type;
-  };
+  // No longer need room type display
 
   // Determine priority display based on booking details
   const getPriorityDisplay = (booking: Booking) => {
@@ -141,7 +133,7 @@ export default function RoomAllocationPage() {
                 <SelectContent>
                   <SelectItem value="date">Check-in Date</SelectItem>
                   <SelectItem value="priority">Priority</SelectItem>
-                  <SelectItem value="room">Room Type</SelectItem>
+                  <SelectItem value="department">Department</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -189,7 +181,7 @@ export default function RoomAllocationPage() {
                       Date Range
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Room Type
+                      Department
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
@@ -214,7 +206,7 @@ export default function RoomAllocationPage() {
                           {formatDate(new Date(booking.checkInDate))} - {formatDate(new Date(booking.checkOutDate))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {getRoomTypeDisplay(booking.roomPreference)}
+                          {booking.referringDepartment}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-xs ${priority.className}`}>
