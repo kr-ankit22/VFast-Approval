@@ -56,7 +56,7 @@ export default function BookingRequests() {
     },
     onSuccess: (updatedBooking) => {
       // More aggressive cache invalidation to ensure UI updates
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       
       toast({
         title: "Booking updated",
@@ -70,11 +70,8 @@ export default function BookingRequests() {
       setIsApproveDialogOpen(false);
       setIsRejectDialogOpen(false);
       
-      // Force refresh current tab by setting a slight delay
-      setTimeout(() => {
-        // This will trigger a re-filter of the bookings
-        setActiveTab(activeTab);
-      }, 100);
+      // Force a hard refresh of the page to ensure data is updated
+      window.location.reload();
     },
     onError: (error: Error) => {
       toast({
