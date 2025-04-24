@@ -6,7 +6,7 @@ import { UserRole } from "@shared/schema";
 type ProtectedRouteProps = {
   path: string;
   component: () => React.JSX.Element;
-  role?: keyof typeof UserRole;
+  role?: UserRole;
 };
 
 export function ProtectedRoute({ path, component: Component, role }: ProtectedRouteProps) {

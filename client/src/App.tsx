@@ -32,25 +32,19 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       
       {/* Booking User Routes */}
-      <Route path="/booking">
-        <ProtectedRoute path="/booking" component={BookingUserDashboard} role="BOOKING" />
-        <ProtectedRoute path="/booking/create" component={CreateBooking} role="BOOKING" />
-        <ProtectedRoute path="/booking/history" component={BookingHistory} role="BOOKING" />
-      </Route>
+      <ProtectedRoute path="/booking" component={BookingUserDashboard} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/booking/create" component={CreateBooking} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/booking/history" component={BookingHistory} role={UserRole.BOOKING} />
       
       {/* Admin Routes */}
-      <Route path="/admin">
-        <ProtectedRoute path="/admin" component={AdminDashboard} role="ADMIN" />
-        <ProtectedRoute path="/admin/requests" component={BookingRequests} role="ADMIN" />
-        <ProtectedRoute path="/admin/rooms" component={RoomManagement} role="ADMIN" />
-      </Route>
+      <ProtectedRoute path="/admin" component={AdminDashboard} role={UserRole.ADMIN} />
+      <ProtectedRoute path="/admin/requests" component={BookingRequests} role={UserRole.ADMIN} />
+      <ProtectedRoute path="/admin/rooms" component={RoomManagement} role={UserRole.ADMIN} />
       
       {/* VFast Routes */}
-      <Route path="/vfast">
-        <ProtectedRoute path="/vfast" component={VFastDashboard} role="VFAST" />
-        <ProtectedRoute path="/vfast/allocation" component={RoomAllocationPage} role="VFAST" />
-        <ProtectedRoute path="/vfast/reconsideration" component={Reconsideration} role="VFAST" />
-      </Route>
+      <ProtectedRoute path="/vfast" component={VFastDashboard} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/allocation" component={RoomAllocationPage} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/reconsideration" component={Reconsideration} role={UserRole.VFAST} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
