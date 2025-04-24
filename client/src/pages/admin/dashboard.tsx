@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus } from "@shared/schema";
+import { UserRole, BookingStatus, type Booking, type Room } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BookCheck, 
@@ -30,12 +30,12 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Get all bookings
-  const { data: allBookings = [], isLoading: isLoadingBookings } = useQuery({
+  const { data: allBookings = [], isLoading: isLoadingBookings } = useQuery<Booking[]>({
     queryKey: ["/api/bookings"]
   });
   
   // Get all rooms
-  const { data: allRooms = [], isLoading: isLoadingRooms } = useQuery({
+  const { data: allRooms = [], isLoading: isLoadingRooms } = useQuery<Room[]>({
     queryKey: ["/api/rooms"]
   });
 

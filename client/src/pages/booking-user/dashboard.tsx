@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
-import { UserRole } from "@shared/schema";
+import { UserRole, BookingStatus, type Booking } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { BookOpen, Clock, CalendarCheck, Hotel } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";

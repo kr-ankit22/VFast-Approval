@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, RoomType } from "@shared/schema";
+import { UserRole, BookingStatus, RoomType, type Booking, type Room } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BookCheck, 
@@ -34,17 +34,17 @@ export default function VFastDashboard() {
   const { user } = useAuth();
   
   // Get approved bookings that need room allocation
-  const { data: approvedBookings = [], isLoading: isLoadingBookings } = useQuery({
+  const { data: approvedBookings = [], isLoading: isLoadingBookings } = useQuery<Booking[]>({
     queryKey: ["/api/bookings/approved"]
   });
   
   // Get reconsideration requests
-  const { data: reconsiderationRequests = [], isLoading: isLoadingRequests } = useQuery({
+  const { data: reconsiderationRequests = [], isLoading: isLoadingRequests } = useQuery<Booking[]>({
     queryKey: ["/api/bookings/reconsideration"]
   });
   
   // Get rooms availability by type
-  const { data: rooms = [], isLoading: isLoadingRooms } = useQuery({
+  const { data: rooms = [], isLoading: isLoadingRooms } = useQuery<Room[]>({
     queryKey: ["/api/rooms"]
   });
 
