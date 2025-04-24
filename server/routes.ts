@@ -54,6 +54,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's bookings (Booking users)
   app.get("/api/my-bookings", checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const bookings = await storage.getBookingsByUserId(req.user.id);
       res.json(bookings);
     } catch (error) {
@@ -71,8 +75,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // Check if user is authorized to view this booking
-      if (req.user.role === UserRole.BOOKING && booking.userId !== req.user.id) {
+      // Check if user is authenticated and authorized to view this booking
+      if (req.user && req.user.role === UserRole.BOOKING && booking.userId !== req.user.id) {
         return res.status(403).json({ message: "Not authorized to view this booking" });
       }
       
