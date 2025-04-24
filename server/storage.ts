@@ -32,6 +32,7 @@ export interface IStorage {
   getRoomByNumber(roomNumber: string): Promise<Room | undefined>;
   getAllRooms(): Promise<Room[]>;
   getAvailableRoomsByType(type: string): Promise<Room[]>;
+  getAllAvailableRooms(): Promise<Room[]>;
   createRoom(room: InsertRoom): Promise<Room>;
   updateRoomAvailability(id: number, isAvailable: boolean): Promise<Room | undefined>;
   
@@ -178,6 +179,13 @@ export class DatabaseStorage implements IStorage {
           eq(rooms.isAvailable, true)
         )
       );
+  }
+  
+  async getAllAvailableRooms(): Promise<Room[]> {
+    return await db
+      .select()
+      .from(rooms)
+      .where(eq(rooms.isAvailable, true));
   }
 
   async createRoom(insertRoom: InsertRoom): Promise<Room> {

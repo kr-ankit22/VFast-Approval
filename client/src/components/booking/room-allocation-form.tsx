@@ -44,13 +44,13 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
   const { toast } = useToast();
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
-  // Fetch available rooms based on booking's room preference
+  // Fetch all available rooms - we no longer filter by room preference
   const {
     data: availableRooms,
     isLoading: isLoadingRooms,
     isError: isRoomsError,
   } = useQuery<Room[]>({
-    queryKey: [`/api/rooms/available/${booking.roomPreference}`],
+    queryKey: ['/api/rooms/available'],
     queryFn: async ({ queryKey }) => {
       const res = await fetch(queryKey[0] as string);
       if (!res.ok) throw new Error("Failed to fetch available rooms");
@@ -78,7 +78,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/rooms/available/${booking.roomPreference}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/rooms/available'] });
       
       toast({
         title: "Room Allocated",
@@ -147,6 +147,16 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
               </FormItem>
             )}
           />
+          
+          <div>
+            <FormLabel>Referring Department</FormLabel>
+            <div className="h-10 px-3 py-2 rounded-md border border-gray-300 bg-gray-100 flex items-center">
+              {booking.referringDepartment}
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Department that made this request
+            </p>
+          </div>
 
           <FormField
             control={form.control}
