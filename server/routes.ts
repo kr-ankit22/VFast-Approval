@@ -167,6 +167,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all available rooms
+  app.get("/api/rooms/available", async (req, res) => {
+    try {
+      const rooms = await storage.getAllAvailableRooms();
+      res.json(rooms);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch available rooms" });
+    }
+  });
+  
   // Get available rooms by type
   app.get("/api/rooms/available/:type", async (req, res) => {
     try {

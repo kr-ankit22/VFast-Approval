@@ -117,14 +117,14 @@ export default function BookingHistory() {
             <DialogHeader>
               <DialogTitle>Booking Details</DialogTitle>
               <DialogDescription>
-                Request #{selectedBooking.id} submitted on {formatDate(new Date(selectedBooking.createdAt))}
+                Request #{selectedBooking.id} submitted on {selectedBooking.createdAt ? formatDate(new Date(selectedBooking.createdAt)) : 'N/A'}
               </DialogDescription>
             </DialogHeader>
             
             <div className="py-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Status</h3>
-                <BookingStatusBadge status={selectedBooking.status} />
+                <BookingStatusBadge status={selectedBooking.status as BookingStatus} />
               </div>
 
               <div className="space-y-4">

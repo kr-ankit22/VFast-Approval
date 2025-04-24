@@ -293,7 +293,11 @@ export default function BookingForm() {
                   placeholder="Any special requirements or requests..."
                   className="resize-none"
                   rows={3}
-                  {...field}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
                 />
               </FormControl>
               <FormDescription>
