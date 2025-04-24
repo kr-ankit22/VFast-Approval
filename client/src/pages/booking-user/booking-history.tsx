@@ -6,21 +6,26 @@ import { Link } from "wouter";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 export default function BookingHistory() {
   const { toast } = useToast();
   
   // Fetch user's bookings
-  const { data: bookings, isLoading, error } = useQuery<Booking[]>({
-    queryKey: ["/api/my-bookings"],
-    onError: (err: Error) => {
+  const { data: bookings = [], isLoading, error } = useQuery<Booking[]>({
+    queryKey: ["/api/my-bookings"]
+  });
+  
+  // Show error toast if there's an error
+  useEffect(() => {
+    if (error) {
       toast({
         title: "Error",
-        description: err.message || "Failed to load bookings",
+        description: error instanceof Error ? error.message : "Failed to load bookings",
         variant: "destructive",
       });
-    },
-  });
+    }
+  }, [error, toast]);
   
   // Function to render the status badge with appropriate color
   const renderStatusBadge = (status: BookingStatus) => {
