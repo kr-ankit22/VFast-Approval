@@ -11,12 +11,14 @@ export default function BookingUserDashboard() {
   const { user } = useAuth();
   
   // Get basic stats 
-  const { data: myBookings = [] } = useQuery({
+  const { data: myBookings = [] } = useQuery<Booking[]>({
     queryKey: ["/api/my-bookings"]
   });
 
-  const pendingBookings = myBookings.filter(b => b.status === "pending").length;
-  const approvedBookings = myBookings.filter(b => b.status === "approved" || b.status === "allocated").length;
+  const pendingBookings = myBookings.filter(b => b.status === BookingStatus.PENDING).length;
+  const approvedBookings = myBookings.filter(b => 
+    b.status === BookingStatus.APPROVED || b.status === BookingStatus.ALLOCATED
+  ).length;
   
   return (
     <DashboardLayout 

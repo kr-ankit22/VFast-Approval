@@ -45,28 +45,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Clear any stale query data first
+      queryClient.clear();
+      
+      // Set the user data in cache
       queryClient.setQueryData(["/api/user"], user);
       
-      // Redirect to appropriate dashboard based on user role
-      switch (user.role) {
-        case UserRole.BOOKING:
-          setLocation("/booking");
-          break;
-        case UserRole.ADMIN:
-          setLocation("/admin");
-          break;
-        case UserRole.VFAST:
-          setLocation("/vfast");
-          break;
-        default:
-          setLocation("/");
-      }
-      
+      // Show success toast
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.name}!`,
         variant: "default",
       });
+      
+      // Force a hard navigation to ensure state is refreshed
+      setTimeout(() => {
+        // Redirect to appropriate dashboard based on user role
+        const redirectPath = user.role === UserRole.BOOKING 
+          ? "/booking" 
+          : user.role === UserRole.ADMIN
+            ? "/admin"
+            : user.role === UserRole.VFAST
+              ? "/vfast"
+              : "/";
+              
+        window.location.href = redirectPath;
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
@@ -83,28 +87,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Clear any stale query data first
+      queryClient.clear();
+      
+      // Set the user data in cache
       queryClient.setQueryData(["/api/user"], user);
       
-      // Redirect to appropriate dashboard based on user role
-      switch (user.role) {
-        case UserRole.BOOKING:
-          setLocation("/booking");
-          break;
-        case UserRole.ADMIN:
-          setLocation("/admin");
-          break;
-        case UserRole.VFAST:
-          setLocation("/vfast");
-          break;
-        default:
-          setLocation("/");
-      }
-      
+      // Show success toast
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.name}!`,
         variant: "default",
       });
+      
+      // Force a hard navigation to ensure state is refreshed
+      setTimeout(() => {
+        // Redirect to appropriate dashboard based on user role
+        const redirectPath = user.role === UserRole.BOOKING 
+          ? "/booking" 
+          : user.role === UserRole.ADMIN
+            ? "/admin"
+            : user.role === UserRole.VFAST
+              ? "/vfast"
+              : "/";
+              
+        window.location.href = redirectPath;
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
