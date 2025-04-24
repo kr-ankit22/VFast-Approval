@@ -157,9 +157,9 @@ export default function BookingHistory() {
                 <div className="flex items-start space-x-3">
                   <MapPin className="h-5 w-5 text-primary mt-0.5" />
                   <div>
-                    <p className="font-medium">Room Preference</p>
+                    <p className="font-medium">Referring Department</p>
                     <p className="text-gray-600">
-                      {getRoomTypeDisplay(selectedBooking.roomPreference)}
+                      {selectedBooking.referringDepartment}
                     </p>
                     {selectedBooking.roomNumber && (
                       <p className="text-gray-600">

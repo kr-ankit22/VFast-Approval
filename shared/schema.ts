@@ -61,7 +61,7 @@ export const bookings = pgTable("bookings", {
   guestCount: integer("guest_count").notNull(),
   checkInDate: timestamp("check_in_date").notNull(),
   checkOutDate: timestamp("check_out_date").notNull(),
-  roomPreference: text("room_preference").notNull(),
+  referringDepartment: text("referring_department").notNull(),
   specialRequests: text("special_requests"),
   status: text("status").notNull().default(BookingStatus.PENDING),
   roomNumber: text("room_number"),

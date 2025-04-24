@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { insertBookingSchema, RoomType } from "@shared/schema";
+import { insertBookingSchema } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -63,7 +63,7 @@ export default function BookingForm() {
   const defaultValues: Partial<FormValues> = {
     purpose: "",
     guestCount: 1,
-    roomPreference: RoomType.SINGLE,
+    referringDepartment: "Computer Science",
     specialRequests: "",
   };
 
@@ -247,25 +247,36 @@ export default function BookingForm() {
 
         <FormField
           control={form.control}
-          name="roomPreference"
+          name="referringDepartment"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Room Preference</FormLabel>
+              <FormLabel>Referring Department</FormLabel>
               <Select
                 onValueChange={field.onChange}
                 defaultValue={field.value}
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select room type" />
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value={RoomType.SINGLE}>Single Room</SelectItem>
-                  <SelectItem value={RoomType.DOUBLE}>Double Room</SelectItem>
-                  <SelectItem value={RoomType.DELUXE}>Deluxe Room</SelectItem>
+                  <SelectItem value="Computer Science">Computer Science</SelectItem>
+                  <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                  <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+                  <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                  <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
+                  <SelectItem value="Physics">Physics</SelectItem>
+                  <SelectItem value="Mathematics">Mathematics</SelectItem>
+                  <SelectItem value="Chemistry">Chemistry</SelectItem>
+                  <SelectItem value="Economics">Economics</SelectItem>
+                  <SelectItem value="Management">Management</SelectItem>
+                  <SelectItem value="External Visitor">External Visitor</SelectItem>
                 </SelectContent>
               </Select>
+              <FormDescription>
+                Department requesting or referring this accommodation
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
