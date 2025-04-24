@@ -1,26 +1,320 @@
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import BookingForm from "@/components/booking/booking-form";
-import { UserRole } from "@shared/schema";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertBookingSchema } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+
+// Simplified form schema
+const bookingFormSchema = z.object({
+  purpose: z.string().min(1, "Purpose is required"),
+  guestCount: z.number().min(1, "Minimum 1 guest").max(5, "Maximum 5 guests"),
+  checkInDate: z.date({
+    required_error: "Check-in date is required",
+  }),
+  checkOutDate: z.date({
+    required_error: "Check-out date is required",
+  }),
+  referringDepartment: z.string().min(1, "Department is required"),
+  specialRequests: z.string().optional(),
+}).refine(
+  (data) => data.checkOutDate > data.checkInDate,
+  {
+    message: "Check-out date must be after check-in date",
+    path: ["checkOutDate"],
+  }
+);
+
+type FormValues = z.infer<typeof bookingFormSchema>;
 
 export default function CreateBooking() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+
+  // Form default values
+  const defaultValues: Partial<FormValues> = {
+    purpose: "",
+    guestCount: 1,
+    referringDepartment: "Computer Science",
+    specialRequests: "",
+  };
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(bookingFormSchema),
+    defaultValues,
+  });
+
+  const createBookingMutation = useMutation({
+    mutationFn: async (data: FormValues) => {
+      console.log("Submitting booking:", data);
+      const res = await apiRequest("POST", "/api/bookings", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create booking");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Booking Created",
+        description: "Your booking request has been submitted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-bookings"] });
+      navigate("/booking/history");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "There was an error creating your booking.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  function onSubmit(values: FormValues) {
+    createBookingMutation.mutate(values);
+  }
+
   return (
-    <DashboardLayout 
-      title="Create New Booking"
-      description="Fill out the form below to submit a new booking request"
-      role={UserRole.BOOKING}
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle>Booking Request Form</CardTitle>
-          <CardDescription>
-            Please provide all required information for your upcoming stay at VFast Hostel
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BookingForm />
-        </CardContent>
-      </Card>
-    </DashboardLayout>
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Create Booking</h1>
+        <Button variant="outline" onClick={() => navigate("/booking")}>
+          Back to Dashboard
+        </Button>
+      </div>
+
+      <div className="bg-card p-6 rounded-lg shadow">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="purpose"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Purpose of Visit</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select purpose" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Academic Conference">Academic Conference</SelectItem>
+                        <SelectItem value="Alumni Visit">Alumni Visit</SelectItem>
+                        <SelectItem value="Parent Visit">Parent Visit</SelectItem>
+                        <SelectItem value="Official Work">Official Work</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="guestCount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Guests</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                      />
+                    </FormControl>
+                    <FormDescription>Maximum 5 guests</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="checkInDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Check-in Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date < new Date(new Date().setHours(0, 0, 0, 0))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="checkOutDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Check-out Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => {
+                            const checkInDate = form.getValues().checkInDate;
+                            return (
+                              date < new Date(new Date().setHours(0, 0, 0, 0)) ||
+                              (checkInDate && date <= checkInDate)
+                            );
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="referringDepartment"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referring Department</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Computer Science">Computer Science</SelectItem>
+                      <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                      <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+                      <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                      <SelectItem value="Chemistry">Chemistry</SelectItem>
+                      <SelectItem value="Physics">Physics</SelectItem>
+                      <SelectItem value="Mathematics">Mathematics</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="Economics">Economics</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Department requesting accommodation</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="specialRequests"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Special Requests</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Any special requirements..."
+                      className="resize-none"
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Mention any special accommodations needed
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" disabled={createBookingMutation.isPending}>
+              {createBookingMutation.isPending ? "Submitting..." : "Submit Booking Request"}
+            </Button>
+          </form>
+        </Form>
+      </div>
+    </div>
   );
 }

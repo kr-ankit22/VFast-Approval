@@ -1,213 +1,99 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Booking, BookingStatus } from "@shared/schema";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import BookingTable from "@/components/booking/booking-table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Loader2, X, Calendar, Clock, MapPin, Users, FileText } from "lucide-react";
-import { formatDate, getDaysBetweenDates } from "@/lib/utils";
-import BookingStatusBadge from "@/components/booking/booking-status-badge";
-import { UserRole } from "@shared/schema";
+import { Booking, BookingStatus } from "@shared/schema";
+import { Link } from "wouter";
+import { formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 
 export default function BookingHistory() {
-  const [activeTab, setActiveTab] = useState<string>("all");
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  // Fetch user bookings
-  const { data: bookings, isLoading, isError, error } = useQuery<Booking[]>({
+  const { toast } = useToast();
+  
+  // Fetch user's bookings
+  const { data: bookings, isLoading, error } = useQuery<Booking[]>({
     queryKey: ["/api/my-bookings"],
+    onError: (err: Error) => {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to load bookings",
+        variant: "destructive",
+      });
+    },
   });
-
-  // Filter bookings based on active tab
-  const getFilteredBookings = () => {
-    if (!bookings) return [];
-    
-    switch (activeTab) {
-      case "pending":
-        return bookings.filter(booking => booking.status === BookingStatus.PENDING);
-      case "approved":
-        return bookings.filter(booking => 
-          booking.status === BookingStatus.APPROVED || 
-          booking.status === BookingStatus.ALLOCATED
-        );
-      case "rejected":
-        return bookings.filter(booking => booking.status === BookingStatus.REJECTED);
+  
+  // Function to render the status badge with appropriate color
+  const renderStatusBadge = (status: BookingStatus) => {
+    switch (status) {
+      case BookingStatus.PENDING:
+        return <Badge variant="outline">Pending</Badge>;
+      case BookingStatus.APPROVED:
+        return <Badge variant="outline" className="border-green-500 text-green-500">Approved</Badge>;
+      case BookingStatus.REJECTED:
+        return <Badge variant="outline" className="border-red-500 text-red-500">Rejected</Badge>;
+      case BookingStatus.ALLOCATED:
+        return <Badge variant="outline" className="border-blue-500 text-blue-500">Allocated</Badge>;
       default:
-        return bookings;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  const filteredBookings = getFilteredBookings();
-
-  // Handle view booking details
-  const handleViewBooking = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setIsDialogOpen(true);
-  };
-
-  // Get room type display name
-  const getRoomTypeDisplay = (type: string) => {
-    const types: Record<string, string> = {
-      "single": "Single Room",
-      "double": "Double Room",
-      "deluxe": "Deluxe Room",
-    };
-    return types[type] || type;
-  };
-
+  
   return (
-    <DashboardLayout 
-      title="Booking History"
-      description="View and track all your booking requests"
-      role={UserRole.BOOKING}
-    >
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Your Bookings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="all">All Bookings</TabsTrigger>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="approved">Approved</TabsTrigger>
-              <TabsTrigger value="rejected">Rejected</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2">Loading your bookings...</span>
-            </div>
-          ) : isError ? (
-            <div className="text-center py-8 text-red-500">
-              <X className="h-8 w-8 mx-auto mb-2" />
-              <p>Failed to load bookings: {error?.message}</p>
-            </div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>No {activeTab !== "all" ? activeTab : ""} bookings found.</p>
-            </div>
-          ) : (
-            <BookingTable 
-              bookings={filteredBookings}
-              role="booking"
-              onView={handleViewBooking}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Booking Details Dialog */}
-      {selectedBooking && (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Booking Details</DialogTitle>
-              <DialogDescription>
-                Request #{selectedBooking.id} submitted on {selectedBooking.createdAt ? formatDate(new Date(selectedBooking.createdAt)) : 'N/A'}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="py-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Status</h3>
-                <BookingStatusBadge status={selectedBooking.status} />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <Calendar className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Date Range</p>
-                    <p className="text-gray-600">
-                      {formatDate(new Date(selectedBooking.checkInDate))} - {formatDate(new Date(selectedBooking.checkOutDate))}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {getDaysBetweenDates(new Date(selectedBooking.checkInDate), new Date(selectedBooking.checkOutDate))} days
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Users className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Guest Information</p>
-                    <p className="text-gray-600">
-                      Purpose: {selectedBooking.purpose}
-                    </p>
-                    <p className="text-gray-600">
-                      Number of Guests: {selectedBooking.guestCount}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <MapPin className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Referring Department</p>
-                    <p className="text-gray-600">
-                      {selectedBooking.referringDepartment}
-                    </p>
-                    {selectedBooking.roomNumber && (
-                      <p className="text-gray-600">
-                        Assigned Room: <span className="font-medium">{selectedBooking.roomNumber}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {selectedBooking.specialRequests && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Special Requests</p>
-                      <p className="text-gray-600">{selectedBooking.specialRequests}</p>
-                    </div>
-                  </div>
-                )}
-
-                {(selectedBooking.adminNotes || selectedBooking.vfastNotes) && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Notes</p>
-                      {selectedBooking.adminNotes && (
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500">Admin Note:</p>
-                          <p className="text-gray-600">{selectedBooking.adminNotes}</p>
-                        </div>
-                      )}
-                      {selectedBooking.vfastNotes && (
-                        <div>
-                          <p className="text-xs text-gray-500">VFast Note:</p>
-                          <p className="text-gray-600">{selectedBooking.vfastNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Booking History</h1>
+        <Button variant="outline" asChild>
+          <Link href="/booking">Back to Dashboard</Link>
+        </Button>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : error ? (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+          Failed to load your bookings. Please try again.
+        </div>
+      ) : bookings && bookings.length > 0 ? (
+        <div className="bg-card rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Purpose</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Check-in</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Check-out</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Guests</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Department</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Room</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {bookings.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-muted/50">
+                    <td className="px-4 py-3 text-sm">{booking.purpose}</td>
+                    <td className="px-4 py-3 text-sm">{formatDate(new Date(booking.checkInDate))}</td>
+                    <td className="px-4 py-3 text-sm">{formatDate(new Date(booking.checkOutDate))}</td>
+                    <td className="px-4 py-3 text-sm">{booking.guestCount}</td>
+                    <td className="px-4 py-3 text-sm">{booking.referringDepartment}</td>
+                    <td className="px-4 py-3 text-sm">{renderStatusBadge(booking.status as BookingStatus)}</td>
+                    <td className="px-4 py-3 text-sm">{booking.roomNumber || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-muted p-8 text-center rounded-lg">
+          <p className="text-muted-foreground mb-4">You have no booking requests yet</p>
+          <Button asChild>
+            <Link href="/booking/create">Create Your First Booking</Link>
+          </Button>
+        </div>
       )}
-    </DashboardLayout>
+    </div>
   );
 }
