@@ -1,0 +1,65 @@
+import { Switch, Route } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import LandingPage from "@/pages/landing-page";
+import AuthPage from "@/pages/auth-page";
+import NotFound from "@/pages/not-found";
+import { ProtectedRoute } from "@/lib/protected-route";
+import { UserRole } from "@shared/schema";
+
+// Booking User Pages
+import BookingUserDashboard from "@/pages/booking-user/dashboard";
+import CreateBooking from "@/pages/booking-user/create-booking";
+import BookingHistory from "@/pages/booking-user/booking-history";
+
+// Admin Pages
+import AdminDashboard from "@/pages/admin/dashboard";
+import BookingRequests from "@/pages/admin/booking-requests";
+import RoomManagement from "@/pages/admin/room-management";
+
+// VFast Pages
+import VFastDashboard from "@/pages/vfast/dashboard";
+import RoomAllocationPage from "@/pages/vfast/room-allocation";
+import Reconsideration from "@/pages/vfast/reconsideration";
+
+function Router() {
+  return (
+    <Switch>
+      {/* Public Routes */}
+      <Route path="/" component={LandingPage} />
+      <Route path="/auth" component={AuthPage} />
+      
+      {/* Booking User Routes */}
+      <Route path="/booking">
+        <ProtectedRoute path="/booking" component={BookingUserDashboard} role="BOOKING" />
+        <ProtectedRoute path="/booking/create" component={CreateBooking} role="BOOKING" />
+        <ProtectedRoute path="/booking/history" component={BookingHistory} role="BOOKING" />
+      </Route>
+      
+      {/* Admin Routes */}
+      <Route path="/admin">
+        <ProtectedRoute path="/admin" component={AdminDashboard} role="ADMIN" />
+        <ProtectedRoute path="/admin/requests" component={BookingRequests} role="ADMIN" />
+        <ProtectedRoute path="/admin/rooms" component={RoomManagement} role="ADMIN" />
+      </Route>
+      
+      {/* VFast Routes */}
+      <Route path="/vfast">
+        <ProtectedRoute path="/vfast" component={VFastDashboard} role="VFAST" />
+        <ProtectedRoute path="/vfast/allocation" component={RoomAllocationPage} role="VFAST" />
+        <ProtectedRoute path="/vfast/reconsideration" component={Reconsideration} role="VFAST" />
+      </Route>
+      
+      {/* Fallback to 404 */}
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return <Router />;
+}
+
+export default App;
