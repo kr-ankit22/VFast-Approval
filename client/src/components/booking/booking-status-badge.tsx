@@ -3,7 +3,7 @@ import { BookingStatus } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 interface BookingStatusBadgeProps {
-  status: BookingStatus;
+  status: BookingStatus | string;
   className?: string;
 }
 

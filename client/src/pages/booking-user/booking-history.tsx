@@ -124,7 +124,7 @@ export default function BookingHistory() {
             <div className="py-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Status</h3>
-                <BookingStatusBadge status={selectedBooking.status as BookingStatus} />
+                <BookingStatusBadge status={selectedBooking.status} />
               </div>
 
               <div className="space-y-4">

@@ -250,7 +250,7 @@ export default function BookingRequests() {
             <DialogHeader>
               <DialogTitle>Booking Request Details</DialogTitle>
               <DialogDescription>
-                Request #{selectedBooking.id} submitted on {formatDate(new Date(selectedBooking.createdAt))}
+                Request #{selectedBooking.id} submitted on {selectedBooking.createdAt ? formatDate(new Date(selectedBooking.createdAt)) : 'N/A'}
               </DialogDescription>
             </DialogHeader>
             
