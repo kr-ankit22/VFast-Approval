@@ -10,9 +10,9 @@ import { Toaster } from "@/components/ui/toaster";
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <AuthProvider>
         <App />
+        <Toaster />
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

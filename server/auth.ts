@@ -11,7 +11,17 @@ import { fromZodError } from "zod-validation-error";
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    // Define interface to match the User type from schema.ts
+    interface User {
+      id: number;
+      name: string;
+      email: string;
+      password: string;
+      role: UserRole;
+      phone?: string;
+      department?: string;
+      createdAt: Date;
+    }
   }
 }
 
