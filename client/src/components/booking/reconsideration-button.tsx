@@ -30,7 +30,7 @@ export default function ReconsiderationButton({ booking }: ReconsiderationButton
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to request reconsideration.",
         variant: "destructive",
       });
     },

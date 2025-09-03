@@ -31,7 +31,8 @@ export interface IStorage {
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined>;
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
-  softDeleteBooking(id: number): Promise<Booking | undefined>;
+  
+  // Room operations
   
   // Room operations
   getRoom(id: number): Promise<Room | undefined>;

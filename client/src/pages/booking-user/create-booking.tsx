@@ -36,14 +36,14 @@ import { Loader2 } from "lucide-react";
 // Simplified form schema
 const bookingFormSchema = z.object({
   purpose: z.string().min(1, "Purpose is required"),
-  guestCount: z.number().min(1, "Minimum 1 guest").max(5, "Maximum 5 guests"),
+  guestCount: z.coerce.number().min(1, "Minimum 1 guest").max(5, "Maximum 5 guests"),
   checkInDate: z.date({
     required_error: "Check-in date is required",
   }),
   checkOutDate: z.date({
     required_error: "Check-out date is required",
   }),
-  department_id: z.number().min(1, "Department is required"),
+  department_id: z.coerce.number().min(1, "Department is required"),
   specialRequests: z.string().optional(),
 }).refine(
   (data) => data.checkOutDate > data.checkInDate,
@@ -64,7 +64,7 @@ export default function CreateBooking() {
   const defaultValues: Partial<FormValues> = {
     purpose: "",
     guestCount: 1,
-    referringDepartment: "",
+    // referringDepartment: "", // This field is not in the schema, remove it
     specialRequests: "",
   };
 
@@ -75,7 +75,7 @@ export default function CreateBooking() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      console.log("Submitting booking:", data);
+      // console.log("Submitting booking:", data); // Commented out for clean console
       const res = await apiRequest("POST", "/api/bookings", data);
       if (!res.ok) {
         const errorData = await res.json();
@@ -125,7 +125,7 @@ export default function CreateBooking() {
                     <FormLabel>Purpose of Visit</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -157,7 +157,6 @@ export default function CreateBooking() {
                         min={1}
                         max={5}
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                       />
                     </FormControl>
                     <FormDescription>Maximum 5 guests</FormDescription>
@@ -264,8 +263,8 @@ export default function CreateBooking() {
                 <FormItem>
                   <FormLabel>Referring Department</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(parseInt(value, 10))}
-                    defaultValue={String(field.value)}
+                    onValueChange={field.onChange}
+                    value={field.value ? String(field.value) : ""}
                   >
                     <FormControl>
                       <SelectTrigger>

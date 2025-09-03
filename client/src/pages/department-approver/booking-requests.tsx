@@ -261,6 +261,27 @@ export default function DepartmentBookingRequests() {
                     </div>
                   </div>
                 )}
+
+                {(selectedBooking.adminNotes || selectedBooking.vfastNotes) && (
+                  <div className="flex items-start space-x-3">
+                    <FileText className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium">Notes</p>
+                      {selectedBooking.adminNotes && (
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-500">Admin Note:</p>
+                          <p className="text-gray-600">{selectedBooking.adminNotes}</p>
+                        </div>
+                      )}
+                      {selectedBooking.vfastNotes && (
+                        <div>
+                          <p className="text-xs text-gray-500">VFast Note:</p>
+                          <p className="text-gray-600">{selectedBooking.vfastNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
