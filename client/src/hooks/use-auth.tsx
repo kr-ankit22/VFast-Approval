@@ -63,7 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Redirect to appropriate dashboard based on user role
         const redirectPath = user.role === UserRole.BOOKING 
           ? "/booking" 
-          : user.role === UserRole.ADMIN
+          : user.role === UserRole.DEPARTMENT_APPROVER
+            ? "/department"
+            : user.role === UserRole.ADMIN
             ? "/admin"
             : user.role === UserRole.VFAST
               ? "/vfast"
@@ -105,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Redirect to appropriate dashboard based on user role
         const redirectPath = user.role === UserRole.BOOKING 
           ? "/booking" 
-          : user.role === UserRole.ADMIN
+          : user.role === UserRole.DEPARTMENT_APPROVER
+            ? "/department"
+            : user.role === UserRole.ADMIN
             ? "/admin"
             : user.role === UserRole.VFAST
               ? "/vfast"

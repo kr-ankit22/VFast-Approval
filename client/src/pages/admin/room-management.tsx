@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Room, RoomType } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Room, RoomStatus } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { 
   Loader2, 
@@ -27,8 +26,11 @@ import {
   RefrigeratorIcon 
 } from "lucide-react";
 import { UserRole } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RoomManagement() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
 
@@ -41,6 +43,32 @@ export default function RoomManagement() {
   } = useQuery<Room[]>({
     queryKey: ["/api/rooms"],
   });
+
+  const updateRoomStatusMutation = useMutation({
+    mutationFn: async (data: { id: number; status: RoomStatus }) => {
+      const res = await apiRequest("PATCH", `/api/rooms/${data.id}/status`, { status: data.status });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      toast({
+        title: "Room status updated",
+        description: "The room status has been successfully updated.",
+        variant: "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update room status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMarkAsReserved = (room: Room) => {
+    updateRoomStatusMutation.mutate({ id: room.id, status: RoomStatus.RESERVED });
+  };
 
   // Filter rooms based on active tab and search term
   const getFilteredRooms = () => {
@@ -66,16 +94,6 @@ export default function RoomManagement() {
   };
 
   const filteredRooms = getFilteredRooms();
-
-  // Get room type display name
-  const getRoomTypeDisplay = (type: string) => {
-    const types: Record<string, string> = {
-      [RoomType.SINGLE]: "Single Room",
-      [RoomType.DOUBLE]: "Double Room",
-      [RoomType.DELUXE]: "Deluxe Room",
-    };
-    return types[type] || type;
-  };
 
   // Get floor display
   const getFloorDisplay = (floor: number) => {
@@ -135,14 +153,7 @@ export default function RoomManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="all">All Rooms</TabsTrigger>
-              <TabsTrigger value={RoomType.SINGLE}>Single</TabsTrigger>
-              <TabsTrigger value={RoomType.DOUBLE}>Double</TabsTrigger>
-              <TabsTrigger value={RoomType.DELUXE}>Deluxe</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          
 
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -187,7 +198,7 @@ export default function RoomManagement() {
                   {filteredRooms.map((room) => (
                     <TableRow key={room.id}>
                       <TableCell className="font-medium">{room.roomNumber}</TableCell>
-                      <TableCell>{getRoomTypeDisplay(room.type)}</TableCell>
+                      <TableCell>{room.type}</TableCell>
                       <TableCell>{getFloorDisplay(room.floor)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -204,10 +215,12 @@ export default function RoomManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {room.isAvailable ? (
+                        {room.status === RoomStatus.AVAILABLE ? (
                           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Available</Badge>
-                        ) : (
+                        ) : room.status === RoomStatus.OCCUPIED ? (
                           <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Occupied</Badge>
+                        ) : (
+                          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Reserved</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -218,9 +231,10 @@ export default function RoomManagement() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className={room.isAvailable ? "text-red-600" : "text-green-600"}
+                            onClick={() => handleMarkAsReserved(room)}
+                            disabled={room.status === RoomStatus.RESERVED}
                           >
-                            {room.isAvailable ? "Mark Occupied" : "Mark Available"}
+                            Mark as Reserved
                           </Button>
                         </div>
                       </TableCell>

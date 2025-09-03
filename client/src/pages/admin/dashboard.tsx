@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, type Booking, type Room } from "@shared/schema";
+import { UserRole, BookingStatus, type Booking, type Room, RoomStatus } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BookCheck, 
@@ -31,19 +31,22 @@ export default function AdminDashboard() {
 
   // Get all bookings
   const { data: allBookings = [], isLoading: isLoadingBookings } = useQuery<Booking[]>({
-    queryKey: ["/api/bookings"]
+    queryKey: ["/api/bookings"],
+    staleTime: 0,
+    refetchInterval: 5000,
   });
   
   // Get all rooms
   const { data: allRooms = [], isLoading: isLoadingRooms } = useQuery<Room[]>({
-    queryKey: ["/api/rooms"]
+    queryKey: ["/api/rooms"],
+    refetchOnWindowFocus: true,
   });
 
   // Calculate statistics 
-  const pendingRequests = allBookings.filter(b => b.status === BookingStatus.PENDING).length;
+  const pendingRequests = allBookings.filter(b => b.status === BookingStatus.PENDING_ADMIN_APPROVAL).length;
   const approvedRequests = allBookings.filter(b => b.status === BookingStatus.APPROVED).length;
   const allocatedRooms = allBookings.filter(b => b.status === BookingStatus.ALLOCATED).length;
-  const availableRooms = allRooms.filter(r => r.isAvailable).length;
+  const availableRooms = allRooms.filter(r => r.status === RoomStatus.AVAILABLE).length;
   const totalRooms = allRooms.length;
 
   // Function to render the status badge with appropriate color
@@ -271,25 +274,25 @@ export default function AdminDashboard() {
                   <div 
                     key={room.id} 
                     className={`p-4 rounded-lg border flex flex-col items-center ${
-                      room.isAvailable 
+                      room.status === RoomStatus.AVAILABLE 
                         ? 'border-green-200 bg-green-50' 
                         : 'border-red-200 bg-red-50'
                     }`}
                   >
                     <HotelIcon className={`h-6 w-6 mb-2 ${
-                      room.isAvailable ? 'text-green-500' : 'text-red-500'
+                      room.status === RoomStatus.AVAILABLE ? 'text-green-500' : 'text-red-500'
                     }`} />
                     <div className="text-lg font-semibold">{room.roomNumber}</div>
                     <div className="text-sm text-muted-foreground capitalize">{room.type}</div>
                     <Badge 
                       variant="outline" 
                       className={`mt-2 ${
-                        room.isAvailable 
+                        room.status === RoomStatus.AVAILABLE 
                           ? 'border-green-500 text-green-500' 
                           : 'border-red-500 text-red-500'
                       }`}
                     >
-                      {room.isAvailable ? 'Available' : 'Occupied'}
+                      {room.status === RoomStatus.AVAILABLE ? 'Available' : (room.status === RoomStatus.OCCUPIED ? 'Occupied' : 'Reserved')}
                     </Badge>
                   </div>
                 ))}

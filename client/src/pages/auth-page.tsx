@@ -52,7 +52,7 @@ const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum([UserRole.BOOKING, UserRole.ADMIN, UserRole.VFAST]),
+  role: z.enum([UserRole.BOOKING, UserRole.DEPARTMENT_APPROVER, UserRole.ADMIN, UserRole.VFAST]),
   phone: z.string().optional(),
   department: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -74,6 +74,9 @@ export default function AuthPage() {
       switch (user.role) {
         case UserRole.BOOKING:
           navigate("/booking");
+          break;
+        case UserRole.DEPARTMENT_APPROVER:
+          navigate("/department");
           break;
         case UserRole.ADMIN:
           navigate("/admin");
@@ -115,9 +118,7 @@ export default function AuthPage() {
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    // Remove confirmPassword before sending to API
-    const { confirmPassword, ...registerData } = data;
-    registerMutation.mutate(registerData);
+    registerMutation.mutate(data);
   };
 
   return (
@@ -297,13 +298,16 @@ export default function AuthPage() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value={UserRole.BOOKING}>
-                                      Booking User
+                                      Requestor
+                                    </SelectItem>
+                                    <SelectItem value={UserRole.DEPARTMENT_APPROVER}>
+                                      Department Approver
                                     </SelectItem>
                                     <SelectItem value={UserRole.ADMIN}>
-                                      Admin User
+                                      Admin
                                     </SelectItem>
                                     <SelectItem value={UserRole.VFAST}>
-                                      VFast User
+                                      VFast
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>

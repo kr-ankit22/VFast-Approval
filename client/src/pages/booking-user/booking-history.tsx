@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Booking, BookingStatus, UserRole } from "@shared/schema";
 import { Link } from "wouter";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { 
   Calendar, 
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+import ReconsiderationButton from "@/components/booking/reconsideration-button";
 
 export default function BookingHistory() {
   const { toast } = useToast();
@@ -32,7 +33,7 @@ export default function BookingHistory() {
   const [showFilters, setShowFilters] = useState(false);
   
   // Fetch user's bookings
-  const { data: bookings = [], isLoading, error } = useQuery<Booking[]>({
+  const { data: bookings = [], isLoading, error } = useQuery<any[]>({
     queryKey: ["/api/my-bookings"]
   });
   
@@ -50,14 +51,18 @@ export default function BookingHistory() {
   // Function to render the status badge with appropriate color
   const renderStatusBadge = (status: BookingStatus) => {
     switch (status) {
-      case BookingStatus.PENDING:
-        return <Badge variant="outline">Pending</Badge>;
+      case BookingStatus.PENDING_DEPARTMENT_APPROVAL:
+        return <Badge variant="outline">Pending Department Approval</Badge>;
+      case BookingStatus.PENDING_ADMIN_APPROVAL:
+        return <Badge variant="outline">Pending Admin Approval</Badge>;
       case BookingStatus.APPROVED:
         return <Badge variant="outline" className="border-green-500 text-green-500">Approved</Badge>;
       case BookingStatus.REJECTED:
         return <Badge variant="outline" className="border-red-500 text-red-500">Rejected</Badge>;
       case BookingStatus.ALLOCATED:
         return <Badge variant="outline" className="border-blue-500 text-blue-500">Allocated</Badge>;
+      case BookingStatus.PENDING_RECONSIDERATION:
+        return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Pending Reconsideration</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -75,7 +80,7 @@ export default function BookingHistory() {
       const searchLower = searchTerm.toLowerCase();
       return (
         booking.purpose.toLowerCase().includes(searchLower) ||
-        booking.referringDepartment.toLowerCase().includes(searchLower) ||
+        (booking.departmentName && booking.departmentName.toLowerCase().includes(searchLower)) ||
         (booking.roomNumber && booking.roomNumber.toLowerCase().includes(searchLower))
       );
     }
@@ -128,10 +133,12 @@ export default function BookingHistory() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="allocated">Allocated</SelectItem>
+                    <SelectItem value={BookingStatus.PENDING_DEPARTMENT_APPROVAL}>Pending Department Approval</SelectItem>
+                    <SelectItem value={BookingStatus.PENDING_ADMIN_APPROVAL}>Pending Admin Approval</SelectItem>
+                    <SelectItem value={BookingStatus.APPROVED}>Approved</SelectItem>
+                    <SelectItem value={BookingStatus.REJECTED}>Rejected</SelectItem>
+                    <SelectItem value={BookingStatus.ALLOCATED}>Allocated</SelectItem>
+                    <SelectItem value={BookingStatus.PENDING_RECONSIDERATION}>Pending Reconsideration</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -192,7 +199,7 @@ export default function BookingHistory() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-900">{booking.guestCount}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900">{booking.referringDepartment}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900">{booking.departmentName}</td>
                     <td className="px-4 py-4 text-sm">{renderStatusBadge(booking.status as BookingStatus)}</td>
                     <td className="px-4 py-4 text-sm text-gray-900">
                       {booking.roomNumber || 
@@ -200,6 +207,7 @@ export default function BookingHistory() {
                       }
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-900">
+                      {booking.status === BookingStatus.REJECTED && <ReconsiderationButton booking={booking} />}
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                         <FileSearch className="h-4 w-4" />
                         <span className="sr-only">View Details</span>

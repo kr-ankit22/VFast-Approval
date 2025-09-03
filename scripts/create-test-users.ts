@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { db } from "../server/db";
 import { users, UserRole } from "../shared/schema";
 import { scrypt, randomBytes } from "crypto";
@@ -34,7 +35,7 @@ async function createTestUsers() {
       password: await hashPassword("password123"),
       role: UserRole.BOOKING,
       phone: "+91 98765 43210",
-      department: "Computer Science",
+      department_id: 1,
     },
     {
       name: "Admin User",
@@ -42,7 +43,7 @@ async function createTestUsers() {
       password: await hashPassword("password123"),
       role: UserRole.ADMIN,
       phone: "+91 98765 43211",
-      department: "Administration",
+      department_id: 2,
     },
     {
       name: "VFast User",
@@ -50,7 +51,7 @@ async function createTestUsers() {
       password: await hashPassword("password123"),
       role: UserRole.VFAST,
       phone: "+91 98765 43212",
-      department: "Hostel Management",
+      department_id: 3,
     }
   ];
   

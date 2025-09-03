@@ -35,23 +35,24 @@ import { UserRole } from "@shared/schema";
 
 export default function BookingRequests() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<string>("pending");
+  const [activeTab, setActiveTab] = useState<string>("pending_admin_approval");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
 
   // Fetch all bookings
-  const { data: bookings, isLoading, isError, error } = useQuery<Booking[]>({
+  const { data: bookings, isLoading, isError, error } = useQuery<any[]>({
     queryKey: ["/api/bookings"],
+    refetchOnWindowFocus: true, // Refetch on window focus
+    refetchInterval: 5000, // Refetch every 5 seconds
   });
 
-  // Update booking status mutation
-  const updateBookingStatusMutation = useMutation({
-    mutationFn: async (data: { id: number; status: BookingStatus; notes?: string }) => {
-      const res = await apiRequest("PATCH", `/api/bookings/${data.id}/status`, data);
+  const updateBookingMutation = useMutation({
+    mutationFn: async (data: { id: number; url: string; status?: BookingStatus; notes?: string }) => {
+      const res = await apiRequest("PATCH", data.url, { status: data.status, notes: data.notes });
       return await res.json();
     },
     onSuccess: (updatedBooking) => {
@@ -90,8 +91,8 @@ export default function BookingRequests() {
     
     // Filter by status
     switch (activeTab) {
-      case "pending":
-        filtered = filtered.filter(booking => booking.status === BookingStatus.PENDING);
+      case "pending_admin_approval":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.PENDING_ADMIN_APPROVAL);
         break;
       case "approved":
         filtered = filtered.filter(booking => booking.status === BookingStatus.APPROVED);
@@ -101,6 +102,9 @@ export default function BookingRequests() {
         break;
       case "allocated":
         filtered = filtered.filter(booking => booking.status === BookingStatus.ALLOCATED);
+        break;
+      case "pending_reconsideration":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.PENDING_RECONSIDERATION);
         break;
       // "all" tab doesn't need filtering
     }
@@ -121,19 +125,19 @@ export default function BookingRequests() {
   const filteredBookings = getFilteredBookings();
 
   // Handle view booking details
-  const handleViewBooking = (booking: Booking) => {
+  const handleViewBooking = (booking: any) => {
     setSelectedBooking(booking);
     setIsViewDialogOpen(true);
   };
 
   // Handle approve booking
-  const handleApproveBooking = (booking: Booking) => {
+  const handleApproveBooking = (booking: any) => {
     setSelectedBooking(booking);
     setIsApproveDialogOpen(true);
   };
 
   // Handle reject booking
-  const handleRejectBooking = (booking: Booking) => {
+  const handleRejectBooking = (booking: any) => {
     setSelectedBooking(booking);
     setIsRejectDialogOpen(true);
   };
@@ -142,8 +146,9 @@ export default function BookingRequests() {
   const submitApproveBooking = () => {
     if (!selectedBooking) return;
     
-    updateBookingStatusMutation.mutate({
+    updateBookingMutation.mutate({
       id: selectedBooking.id,
+      url: `/api/bookings/${selectedBooking.id}/status`,
       status: BookingStatus.APPROVED,
       notes: adminNotes,
     });
@@ -153,10 +158,9 @@ export default function BookingRequests() {
   const submitRejectBooking = () => {
     if (!selectedBooking) return;
     
-    updateBookingStatusMutation.mutate({
+    updateBookingMutation.mutate({
       id: selectedBooking.id,
-      status: BookingStatus.REJECTED,
-      notes: adminNotes,
+      url: `/api/bookings/${selectedBooking.id}/soft-delete`,
     });
   };
 
@@ -192,13 +196,14 @@ export default function BookingRequests() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="grid grid-cols-5">
+          <Tabs defaultValue="pending_admin_approval" value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList className="grid grid-cols-6">
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="pending_admin_approval">Pending</TabsTrigger>
               <TabsTrigger value="approved">Approved</TabsTrigger>
               <TabsTrigger value="allocated">Allocated</TabsTrigger>
               <TabsTrigger value="rejected">Rejected</TabsTrigger>
+              <TabsTrigger value="pending_reconsideration">Reconsideration</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -231,10 +236,17 @@ export default function BookingRequests() {
           ) : (
             <BookingTable 
               bookings={filteredBookings}
-              role="admin"
-              onView={handleViewBooking}
-              onApprove={activeTab === "pending" ? handleApproveBooking : undefined}
-              onReject={activeTab === "pending" ? handleRejectBooking : undefined}
+              renderActions={(booking) => (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
+                  {(booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.PENDING_RECONSIDERATION) && (
+                    <>
+                      <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking)}>Reject</Button>
+                    </>
+                  )}
+                </div>
+              )}
             />
           )}
 
@@ -299,7 +311,7 @@ export default function BookingRequests() {
                   <div>
                     <p className="font-medium">Referring Department</p>
                     <p className="text-gray-600">
-                      {selectedBooking.referringDepartment}
+                      {selectedBooking.departmentName}
                     </p>
                     {selectedBooking.roomNumber && (
                       <p className="text-gray-600">
@@ -343,7 +355,7 @@ export default function BookingRequests() {
             </div>
             
             <DialogFooter>
-              {selectedBooking.status === BookingStatus.PENDING && (
+              {(selectedBooking.status === BookingStatus.PENDING_ADMIN_APPROVAL || selectedBooking.status === BookingStatus.PENDING_RECONSIDERATION) && (
                 <>
                   <Button 
                     variant="destructive" 
@@ -364,7 +376,7 @@ export default function BookingRequests() {
                   </Button>
                 </>
               )}
-              {selectedBooking.status !== BookingStatus.PENDING && (
+              {selectedBooking.status !== BookingStatus.PENDING_ADMIN_APPROVAL && selectedBooking.status !== BookingStatus.PENDING_RECONSIDERATION && (
                 <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
               )}
             </DialogFooter>
@@ -396,9 +408,9 @@ export default function BookingRequests() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction 
                 onClick={submitApproveBooking}
-                disabled={updateBookingStatusMutation.isPending}
+                disabled={updateBookingMutation.isPending}
               >
-                {updateBookingStatusMutation.isPending ? "Approving..." : "Approve Request"}
+                {updateBookingMutation.isPending ? "Approving..." : "Approve Request"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -429,9 +441,9 @@ export default function BookingRequests() {
               <AlertDialogAction 
                 onClick={submitRejectBooking}
                 className="bg-destructive hover:bg-destructive/90"
-                disabled={updateBookingStatusMutation.isPending}
+                disabled={updateBookingMutation.isPending}
               >
-                {updateBookingStatusMutation.isPending ? "Rejecting..." : "Reject Request"}
+                {updateBookingMutation.isPending ? "Rejecting..." : "Reject Request"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

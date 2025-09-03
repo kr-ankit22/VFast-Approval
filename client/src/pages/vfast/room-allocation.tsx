@@ -28,7 +28,7 @@ export default function RoomAllocationPage() {
 
   // Fetch bookings that need allocation (APPROVED status)
   const {
-    data: bookings,
+    data: bookings = [],
     isLoading,
     isError,
     error,
@@ -93,7 +93,7 @@ export default function RoomAllocationPage() {
   // Determine priority display based on booking details
   const getPriorityDisplay = (booking: Booking) => {
     // For demo purposes, we'll use guest count and purpose to determine priority
-    // In a real app, you might have specific business logic
+    // In a real app, you might have a specific priority field
     if (booking.purpose.includes("Official") || booking.guestCount > 3) {
       return { label: "High", className: "bg-red-100 text-red-800" };
     } else if (booking.purpose.includes("Academic") || booking.guestCount > 1) {
@@ -206,7 +206,7 @@ export default function RoomAllocationPage() {
                           {formatDate(new Date(booking.checkInDate))} - {formatDate(new Date(booking.checkOutDate))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {booking.referringDepartment}
+                          {booking.departmentName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-xs ${priority.className}`}>

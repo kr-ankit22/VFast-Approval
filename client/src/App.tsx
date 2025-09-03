@@ -14,6 +14,10 @@ import BookingUserDashboard from "@/pages/booking-user/dashboard";
 import CreateBooking from "@/pages/booking-user/create-booking";
 import BookingHistory from "@/pages/booking-user/booking-history";
 
+// Department Approver Pages
+import DepartmentApproverDashboard from "@/pages/department-approver/dashboard";
+import DepartmentBookingRequests from "@/pages/department-approver/booking-requests";
+
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import BookingRequests from "@/pages/admin/booking-requests";
@@ -36,6 +40,10 @@ function Router() {
       <ProtectedRoute path="/booking/create" component={CreateBooking} role={UserRole.BOOKING} />
       <ProtectedRoute path="/booking/history" component={BookingHistory} role={UserRole.BOOKING} />
       
+      {/* Department Approver Routes */}
+      <ProtectedRoute path="/department" component={DepartmentApproverDashboard} role={UserRole.DEPARTMENT_APPROVER} />
+      <ProtectedRoute path="/department/requests" component={DepartmentBookingRequests} role={UserRole.DEPARTMENT_APPROVER} />
+
       {/* Admin Routes */}
       <ProtectedRoute path="/admin" component={AdminDashboard} role={UserRole.ADMIN} />
       <ProtectedRoute path="/admin/requests" component={BookingRequests} role={UserRole.ADMIN} />

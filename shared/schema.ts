@@ -5,24 +5,38 @@ import { z } from "zod";
 // User role enum
 export enum UserRole {
   BOOKING = "booking",
+  DEPARTMENT_APPROVER = "department_approver",
   ADMIN = "admin",
-  VFAST = "vfast"
+  VFAST = "vfast",
 }
 
 // Booking status enum
 export enum BookingStatus {
-  PENDING = "pending",
+  PENDING_DEPARTMENT_APPROVAL = "pending_department_approval",
+  PENDING_ADMIN_APPROVAL = "pending_admin_approval",
   APPROVED = "approved",
   REJECTED = "rejected",
-  ALLOCATED = "allocated"
+  ALLOCATED = "allocated",
+  PENDING_RECONSIDERATION = "pending_reconsideration"
 }
 
 // Room type enum
 export enum RoomType {
-  SINGLE = "single",
-  DOUBLE = "double",
-  DELUXE = "deluxe"
+  STANDARD = "standard"
 }
+
+// Room status enum
+export enum RoomStatus {
+  AVAILABLE = "available",
+  OCCUPIED = "occupied",
+  RESERVED = "reserved",
+}
+
+// Departments table
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+});
 
 // User table
 export const users = pgTable("users", {
@@ -32,7 +46,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default(UserRole.BOOKING),
   phone: text("phone"),
-  department: text("department"),
+  department_id: integer("department_id").references(() => departments.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -56,26 +70,30 @@ export const loginUserSchema = z.object({
 // Booking table
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id),
   purpose: text("purpose").notNull(),
   guestCount: integer("guest_count").notNull(),
   checkInDate: timestamp("check_in_date").notNull(),
   checkOutDate: timestamp("check_out_date").notNull(),
-  referringDepartment: text("referring_department").notNull(),
+  department_id: integer("department_id").notNull().references(() => departments.id),
   specialRequests: text("special_requests"),
-  status: text("status").notNull().default(BookingStatus.PENDING),
+  status: text("status").notNull().default(BookingStatus.PENDING_DEPARTMENT_APPROVAL),
   roomNumber: text("room_number"),
   adminNotes: text("admin_notes"),
   vfastNotes: text("vfast_notes"),
+  departmentApproverId: integer("department_approver_id").references(() => users.id),
+  adminApproverId: integer("admin_approver_id").references(() => users.id),
+  departmentApprovalAt: timestamp("department_approval_at"),
+  adminApprovalAt: timestamp("admin_approval_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
 // Insert schema for booking creation
 export const insertBookingSchema = createInsertSchema(bookings)
   .omit({ 
     id: true, 
-    status: true, 
     roomNumber: true, 
     adminNotes: true, 
     vfastNotes: true, 
@@ -87,12 +105,15 @@ export const insertBookingSchema = createInsertSchema(bookings)
 export const updateBookingStatusSchema = z.object({
   id: z.number(),
   status: z.enum([
-    BookingStatus.PENDING, 
+    BookingStatus.PENDING_DEPARTMENT_APPROVAL,
+    BookingStatus.PENDING_ADMIN_APPROVAL,
     BookingStatus.APPROVED, 
     BookingStatus.REJECTED, 
-    BookingStatus.ALLOCATED
+    BookingStatus.ALLOCATED,
+    BookingStatus.PENDING_RECONSIDERATION
   ]),
   notes: z.string().optional(),
+  approverId: z.number().optional(),
 });
 
 // Room allocation schema
@@ -106,9 +127,9 @@ export const roomAllocationSchema = z.object({
 export const rooms = pgTable("rooms", {
   id: serial("id").primaryKey(),
   roomNumber: text("room_number").notNull().unique(),
-  type: text("type").notNull(),
+  type: text("type").notNull().default(RoomType.STANDARD),
   floor: integer("floor").notNull(),
-  isAvailable: boolean("is_available").notNull().default(true),
+  status: text("status").notNull().default(RoomStatus.AVAILABLE),
   features: json("features").default([]),
 });
 
@@ -128,3 +149,5 @@ export type RoomAllocation = z.infer<typeof roomAllocationSchema>;
 
 export type Room = typeof rooms.$inferSelect;
 export type InsertRoom = z.infer<typeof insertRoomSchema>;
+
+export type Department = typeof departments.$inferSelect;

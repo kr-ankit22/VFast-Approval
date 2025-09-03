@@ -30,6 +30,8 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useGetDepartments } from "@/hooks/use-bookings";
+import { Loader2 } from "lucide-react";
 
 // Simplified form schema
 const bookingFormSchema = z.object({
@@ -41,7 +43,7 @@ const bookingFormSchema = z.object({
   checkOutDate: z.date({
     required_error: "Check-out date is required",
   }),
-  referringDepartment: z.string().min(1, "Department is required"),
+  department_id: z.number().min(1, "Department is required"),
   specialRequests: z.string().optional(),
 }).refine(
   (data) => data.checkOutDate > data.checkInDate,
@@ -56,12 +58,13 @@ type FormValues = z.infer<typeof bookingFormSchema>;
 export default function CreateBooking() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const { data: departments, isLoading: isLoadingDepartments } = useGetDepartments();
 
   // Form default values
   const defaultValues: Partial<FormValues> = {
     purpose: "",
     guestCount: 1,
-    referringDepartment: "Computer Science",
+    referringDepartment: "",
     specialRequests: "",
   };
 
@@ -256,29 +259,29 @@ export default function CreateBooking() {
 
             <FormField
               control={form.control}
-              name="referringDepartment"
+              name="department_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Referring Department</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(value) => field.onChange(parseInt(value, 10))}
+                    defaultValue={String(field.value)}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
+                        {isLoadingDepartments ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <SelectValue placeholder="Select department" />
+                        )}
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Computer Science">Computer Science</SelectItem>
-                      <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
-                      <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                      <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                      <SelectItem value="Chemistry">Chemistry</SelectItem>
-                      <SelectItem value="Physics">Physics</SelectItem>
-                      <SelectItem value="Mathematics">Mathematics</SelectItem>
-                      <SelectItem value="Management">Management</SelectItem>
-                      <SelectItem value="Economics">Economics</SelectItem>
+                      {departments?.map((department) => (
+                        <SelectItem key={department.id} value={String(department.id)}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormDescription>Department requesting accommodation</FormDescription>

@@ -29,8 +29,8 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { insertBookingSchema } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
+import { insertBookingSchema, Department } from "@shared/schema";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -43,27 +43,32 @@ const formSchema = insertBookingSchema.extend({
   checkOutDate: z.date({
     required_error: "Please select a check-out date",
   }),
-}).refine(
-  (data) => {
-    return data.checkOutDate > data.checkInDate;
-  },
-  {
-    message: "Check-out date must be after check-in date",
-    path: ["checkOutDate"],
-  }
-);
+  department_id: z.coerce.number().min(1, "Please select a department"),
+});
 
 type FormValues = z.infer<typeof formSchema>;
+
+async function fetchDepartments(): Promise<Department[]> {
+  const res = await apiRequest("GET", "/api/departments");
+  if (!res.ok) {
+    throw new Error("Failed to fetch departments");
+  }
+  return res.json();
+}
 
 export default function BookingForm() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
+  const { data: departments, isLoading: isLoadingDepartments } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
+    queryFn: fetchDepartments,
+  });
+
   // Default form values
   const defaultValues: Partial<FormValues> = {
     purpose: "",
     guestCount: 1,
-    referringDepartment: "Computer Science",
     specialRequests: "",
   };
 
@@ -74,12 +79,9 @@ export default function BookingForm() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      console.log("Submitting booking data:", data);
       try {
         const res = await apiRequest("POST", "/api/bookings", data);
-        console.log("Booking API response status:", res.status);
         const jsonData = await res.json();
-        console.log("Booking API response:", jsonData);
         if (!res.ok) {
           throw new Error(jsonData.message || "Failed to create booking");
         }
@@ -90,9 +92,10 @@ export default function BookingForm() {
       }
     },
     onSuccess: (data) => {
-      console.log("Booking created successfully:", data);
       queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/department-approvals'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
         title: "Booking submitted",
         description: "Your booking request has been successfully submitted.",
@@ -111,6 +114,7 @@ export default function BookingForm() {
   });
 
   function onSubmit(data: FormValues) {
+    console.log("Submitting booking data:", data);
     createBookingMutation.mutate(data);
   }
 
@@ -262,13 +266,17 @@ export default function BookingForm() {
 
         <FormField
           control={form.control}
-          name="referringDepartment"
+          name="department_id"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Referring Department</FormLabel>
               <Select
-                onValueChange={field.onChange}
-                defaultValue={field.value}
+                onValueChange={(value) => {
+                  if (value && !isNaN(parseInt(value, 10))) {
+                    field.onChange(parseInt(value, 10));
+                  }
+                }}
+                defaultValue={String(field.value)}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -276,17 +284,15 @@ export default function BookingForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Computer Science">Computer Science</SelectItem>
-                  <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
-                  <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                  <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                  <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
-                  <SelectItem value="Physics">Physics</SelectItem>
-                  <SelectItem value="Mathematics">Mathematics</SelectItem>
-                  <SelectItem value="Chemistry">Chemistry</SelectItem>
-                  <SelectItem value="Economics">Economics</SelectItem>
-                  <SelectItem value="Management">Management</SelectItem>
-                  <SelectItem value="External Visitor">External Visitor</SelectItem>
+                  {isLoadingDepartments ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : (
+                    departments?.map((dept) => (
+                      <SelectItem key={dept.id} value={String(dept.id)}>
+                        {dept.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <FormDescription>

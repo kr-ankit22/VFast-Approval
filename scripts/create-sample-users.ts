@@ -14,7 +14,7 @@ async function hashPassword(password: string) {
 async function createSampleUsers() {
   try {
     console.log("Creating sample users...");
-    
+
     // Create a student (booking user)
     const studentPassword = await hashPassword("password123");
     const student = await db
@@ -24,7 +24,7 @@ async function createSampleUsers() {
         email: "student@bits.ac.in",
         password: studentPassword,
         role: UserRole.BOOKING,
-        department: "Computer Science"
+        department_id: 1, // Assuming "Computer Science" is the first department
       })
       .returning();
     console.log("Created student user:", student[0].email);
@@ -54,6 +54,20 @@ async function createSampleUsers() {
       })
       .returning();
     console.log("Created vfast user:", vfast[0].email);
+
+    // Create a department approver user
+    const departmentApproverPassword = await hashPassword("password123");
+    const departmentApprover = await db
+      .insert(users)
+      .values({
+        name: "Department Approver",
+        email: "approver@bits.ac.in",
+        password: departmentApproverPassword,
+        role: UserRole.DEPARTMENT_APPROVER,
+        department_id: 1, // Assuming "Computer Science" is the first department
+      })
+      .returning();
+    console.log("Created department approver user:", departmentApprover[0].email);
     
     console.log("Successfully created all sample users!");
   } catch (error) {

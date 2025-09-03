@@ -5,23 +5,24 @@ async function createSampleRooms() {
   try {
     console.log("Creating sample rooms...");
     
-    // Create 10 simple rooms on a single floor
-    const roomsToCreate = [
-      { roomNumber: "R01", type: RoomType.SINGLE, isAvailable: true },
-      { roomNumber: "R02", type: RoomType.SINGLE, isAvailable: true },
-      { roomNumber: "R03", type: RoomType.SINGLE, isAvailable: true },
-      { roomNumber: "R04", type: RoomType.SINGLE, isAvailable: true },
-      { roomNumber: "R05", type: RoomType.DOUBLE, isAvailable: true },
-      { roomNumber: "R06", type: RoomType.DOUBLE, isAvailable: true },
-      { roomNumber: "R07", type: RoomType.DOUBLE, isAvailable: true },
-      { roomNumber: "R08", type: RoomType.DOUBLE, isAvailable: true },
-      { roomNumber: "R09", type: RoomType.DELUXE, isAvailable: true },
-      { roomNumber: "R10", type: RoomType.DELUXE, isAvailable: true },
-    ];
+    const roomsToCreate = [];
+
+    for (let i = 1; i <= 40; i++) {
+      const roomNumber = `R${i < 10 ? '0' : ''}${i}`;
+      const floor = Math.ceil(i / 10); // Distribute across 4 floors
+      
+      roomsToCreate.push({
+        roomNumber,
+        type: RoomType.STANDARD,
+        floor,
+        isAvailable: true,
+        features: [] // You can add features here if needed
+      });
+    }
     
     for (const room of roomsToCreate) {
       await db.insert(rooms).values(room);
-      console.log(`Created room: ${room.roomNumber} (${room.type})`);
+      console.log(`Created room: ${room.roomNumber} (Type: ${room.type}, Floor: ${room.floor})`);
     }
     
     console.log("Successfully created all sample rooms!");

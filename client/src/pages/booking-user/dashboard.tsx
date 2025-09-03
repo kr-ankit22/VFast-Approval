@@ -15,7 +15,11 @@ export default function BookingUserDashboard() {
     queryKey: ["/api/my-bookings"]
   });
 
-  const pendingBookings = myBookings.filter(b => b.status === BookingStatus.PENDING).length;
+  const pendingBookings = myBookings.filter(b => 
+    b.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL ||
+    b.status === BookingStatus.PENDING_ADMIN_APPROVAL ||
+    b.status === BookingStatus.PENDING_RECONSIDERATION
+  ).length;
   const approvedBookings = myBookings.filter(b => 
     b.status === BookingStatus.APPROVED || b.status === BookingStatus.ALLOCATED
   ).length;
@@ -27,7 +31,7 @@ export default function BookingUserDashboard() {
       role={UserRole.BOOKING}
     >
       {/* Stats overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
@@ -58,17 +62,6 @@ export default function BookingUserDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{approvedBookings}</div>
             <p className="text-xs text-muted-foreground">Confirmed bookings</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Rooms</CardTitle>
-            <Hotel className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">10+</div>
-            <p className="text-xs text-muted-foreground">Rooms of various types</p>
           </CardContent>
         </Card>
       </div>

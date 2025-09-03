@@ -93,6 +93,18 @@ export default function DashboardLayout({
         icon: Hotel,
       },
     ],
+    [UserRole.DEPARTMENT_APPROVER]: [
+      {
+        name: "Dashboard",
+        href: "/department",
+        icon: LayoutDashboard,
+      },
+      {
+        name: "Booking Requests",
+        href: "/department/requests",
+        icon: BookCheck,
+      },
+    ],
     [UserRole.VFAST]: [
       {
         name: "Dashboard",

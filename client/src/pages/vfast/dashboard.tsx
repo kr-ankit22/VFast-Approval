@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, RoomType, type Booking, type Room } from "@shared/schema";
+import { UserRole, BookingStatus, RoomType, type Booking, type Room, RoomStatus } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BookCheck, 
@@ -60,35 +60,17 @@ export default function VFastDashboard() {
   const allocationPercentage = totalRequests > 0 ? Math.round((allocatedBookings / totalRequests) * 100) : 0;
   
   // Room statistics by type
-  const singleRooms = rooms.filter(r => r.type === RoomType.SINGLE);
-  const doubleRooms = rooms.filter(r => r.type === RoomType.DOUBLE);
-  const deluxeRooms = rooms.filter(r => r.type === RoomType.DELUXE);
+  const standardRooms = rooms.filter(r => r.type === RoomType.STANDARD);
   
-  const availableSingleRooms = singleRooms.filter(r => r.isAvailable).length;
-  const availableDoubleRooms = doubleRooms.filter(r => r.isAvailable).length;
-  const availableDeluxeRooms = deluxeRooms.filter(r => r.isAvailable).length;
+  const availableStandardRooms = standardRooms.filter(r => r.status === RoomStatus.AVAILABLE).length;
   
   const roomTypeStats = [
     { 
-      type: "Single Rooms", 
-      total: singleRooms.length,
-      available: availableSingleRooms,
+      type: "Standard Rooms", 
+      total: standardRooms.length,
+      available: availableStandardRooms,
       icon: <Bed className="h-4 w-4 text-blue-500" />,
       color: "bg-blue-100" 
-    },
-    { 
-      type: "Double Rooms", 
-      total: doubleRooms.length,
-      available: availableDoubleRooms,
-      icon: <Building className="h-4 w-4 text-amber-500" />,
-      color: "bg-amber-100"
-    },
-    { 
-      type: "Deluxe Rooms", 
-      total: deluxeRooms.length,
-      available: availableDeluxeRooms,
-      icon: <Home className="h-4 w-4 text-purple-500" />,
-      color: "bg-purple-100"
     }
   ];
   
@@ -188,9 +170,7 @@ export default function VFastDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="single">Single</SelectItem>
-                    <SelectItem value="double">Double</SelectItem>
-                    <SelectItem value="deluxe">Deluxe</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -279,7 +259,7 @@ export default function VFastDashboard() {
                     <tr key={i} className="border-b">
                       <td className="py-3 px-4">{booking.id}</td>
                       <td className="py-3 px-4">{booking.purpose}</td>
-                      <td className="py-3 px-4">{booking.referringDepartment}</td>
+                      <td className="py-3 px-4">{booking.departmentName}</td>
                       <td className="py-3 px-4">{formatDate(new Date(booking.checkInDate))}</td>
                       <td className="py-3 px-4">{booking.guestCount}</td>
                       <td className="py-3 px-4">

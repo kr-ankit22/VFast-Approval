@@ -3,7 +3,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Booking, Room, RoomType, roomAllocationSchema } from "@shared/schema";
+import { Booking, Room, RoomType, roomAllocationSchema, RoomStatus } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Form,
@@ -50,7 +50,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     isLoading: isLoadingRooms,
     isError: isRoomsError,
   } = useQuery<Room[]>({
-    queryKey: ['/api/rooms/available'],
+    queryKey: ['/api/rooms'],
     queryFn: async ({ queryKey }) => {
       const res = await fetch(queryKey[0] as string);
       if (!res.ok) throw new Error("Failed to fetch available rooms");
@@ -89,13 +89,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
         variant: "default",
       });
       
-      // Set a short timeout before calling onSuccess to ensure all data is properly updated
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-        
-        // Force a page reload to ensure the UI reflects the updated state
-        window.location.reload();
-      }, 500);
+      if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
       toast({
@@ -120,9 +114,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
   // Get room type display name
   const getRoomTypeDisplay = (type: string) => {
     const types: Record<string, string> = {
-      [RoomType.SINGLE]: "Single Room",
-      [RoomType.DOUBLE]: "Double Room",
-      [RoomType.DELUXE]: "Deluxe Room",
+      [RoomType.STANDARD]: "Standard Room",
     };
     return types[type] || type;
   };
@@ -160,7 +152,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
           <div>
             <FormLabel>Referring Department</FormLabel>
             <div className="h-10 px-3 py-2 rounded-md border border-gray-300 bg-gray-100 flex items-center">
-              {booking.referringDepartment}
+              {booking.departmentName}
             </div>
             <p className="text-sm text-gray-500 mt-1">
               Department that made this request
@@ -194,8 +186,8 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
                       <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
                     ) : availableRooms && availableRooms.length > 0 ? (
                       availableRooms.map((room) => (
-                        <SelectItem key={room.roomNumber} value={room.roomNumber}>
-                          {room.roomNumber} ({getRoomTypeDisplay(room.type)})
+                        <SelectItem key={room.roomNumber} value={room.roomNumber} disabled={room.status !== RoomStatus.AVAILABLE}>
+                          {room.roomNumber} ({getRoomTypeDisplay(room.type)}) - {room.status === RoomStatus.AVAILABLE ? 'Available' : (room.status === RoomStatus.RESERVED ? 'Reserved by Admin' : 'Occupied')}
                         </SelectItem>
                       ))
                     ) : (

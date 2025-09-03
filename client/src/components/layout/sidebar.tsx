@@ -54,6 +54,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/admin/reports", icon: <ChartBar size={18} />, label: "Reports" },
           { href: "/admin/settings", icon: <Settings size={18} />, label: "Settings" }
         ];
+      case UserRole.DEPARTMENT_APPROVER:
+        return [
+          { href: "/department", icon: <Home size={18} />, label: "Dashboard" },
+          { href: "/department/requests", icon: <ClipboardList size={18} />, label: "Booking Requests" },
+          { href: "/profile", icon: <UserCog size={18} />, label: "Profile Settings" }
+        ];
       case UserRole.VFAST:
         return [
           { href: "/vfast", icon: <Home size={18} />, label: "Dashboard" },
@@ -75,6 +81,8 @@ export default function Sidebar({ userRole }: SidebarProps) {
         return "bg-blue-500";
       case UserRole.ADMIN:
         return "bg-purple-500";
+      case UserRole.DEPARTMENT_APPROVER:
+        return "bg-teal-500";
       case UserRole.VFAST:
         return "bg-green-500";
       default:
