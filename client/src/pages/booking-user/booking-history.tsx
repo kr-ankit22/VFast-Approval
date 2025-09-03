@@ -208,10 +208,12 @@ export default function BookingHistory() {
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-900">
                       {booking.status === BookingStatus.REJECTED && <ReconsiderationButton booking={booking} />}
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <FileSearch className="h-4 w-4" />
-                        <span className="sr-only">View Details</span>
-                      </Button>
+                      <Link href={`/booking/${booking.id}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <FileSearch className="h-4 w-4" />
+                          <span className="sr-only">View Details</span>
+                        </Button>
+                      </Link>
                     </td>
                   </tr>
                 ))}

@@ -13,6 +13,7 @@ import { UserRole } from "@shared/schema";
 import BookingUserDashboard from "@/pages/booking-user/dashboard";
 import CreateBooking from "@/pages/booking-user/create-booking";
 import BookingHistory from "@/pages/booking-user/booking-history";
+import BookingDetailsPage from "@/pages/booking-user/booking-details";
 
 // Department Approver Pages
 import DepartmentApproverDashboard from "@/pages/department-approver/dashboard";
@@ -39,6 +40,7 @@ function Router() {
       <ProtectedRoute path="/booking" component={BookingUserDashboard} role={UserRole.BOOKING} />
       <ProtectedRoute path="/booking/create" component={CreateBooking} role={UserRole.BOOKING} />
       <ProtectedRoute path="/booking/history" component={BookingHistory} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/booking/:id" component={BookingDetailsPage} role={UserRole.BOOKING} />
       
       {/* Department Approver Routes */}
       <ProtectedRoute path="/department" component={DepartmentApproverDashboard} role={UserRole.DEPARTMENT_APPROVER} />

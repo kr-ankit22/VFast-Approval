@@ -30,10 +30,12 @@ import { formatDate, getDaysBetweenDates } from "@/lib/utils";
 import BookingStatusBadge from "@/components/booking/booking-status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DepartmentBookingRequests() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("pending_department_approval");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
@@ -46,7 +48,27 @@ export default function DepartmentBookingRequests() {
   const getFilteredBookings = () => {
     if (!bookings) return [];
     
-    let filtered = bookings.filter(b => b.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL);
+    let filtered = bookings;
+
+    // Filter by status
+    switch (activeTab) {
+      case "pending_department_approval":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL);
+        break;
+      case "approved":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.APPROVED);
+        break;
+      case "rejected":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.REJECTED);
+        break;
+      case "allocated":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.ALLOCATED);
+        break;
+      case "pending_reconsideration":
+        filtered = filtered.filter(booking => booking.status === BookingStatus.PENDING_RECONSIDERATION);
+        break;
+      // "all" tab doesn't need filtering
+    }
     
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
@@ -118,6 +140,17 @@ export default function DepartmentBookingRequests() {
           </div>
         </CardHeader>
         <CardContent>
+          <Tabs defaultValue="pending_department_approval" value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList className="grid grid-cols-6">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="pending_department_approval">Pending</TabsTrigger>
+              <TabsTrigger value="approved">Approved</TabsTrigger>
+              <TabsTrigger value="allocated">Allocated</TabsTrigger>
+              <TabsTrigger value="rejected">Rejected</TabsTrigger>
+              <TabsTrigger value="pending_reconsideration">Reconsideration</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -130,7 +163,7 @@ export default function DepartmentBookingRequests() {
             </div>
           ) : filteredBookings.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              <p>No pending booking requests found.</p>
+              <p>No {activeTab !== "all" ? activeTab : ""} booking requests found.</p>
               {searchTerm && (
                 <p className="mt-2">
                   Try a different search term or clear the search.
@@ -150,8 +183,12 @@ export default function DepartmentBookingRequests() {
               renderActions={(booking) => (
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
-                  <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking)}>Reject</Button>
+                  {(booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL || booking.status === BookingStatus.PENDING_RECONSIDERATION) && (
+                    <>
+                      <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking)}>Reject</Button>
+                    </>
+                  )}
                 </div>
               )}
             />

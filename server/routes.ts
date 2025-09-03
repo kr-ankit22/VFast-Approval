@@ -15,7 +15,7 @@ import fs from 'fs/promises';
 // Middleware to check user role
 const checkRole = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: Function) => {
-    console.log("Checking role for user:", req.user);
+    // console.log("Checking role for user:", req.user);
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   app.get("/api/bookings/:id", async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
-      console.log("GET /api/bookings/:id - bookingId:", bookingId);
+      // console.log("GET /api/bookings/:id - bookingId:", bookingId);
       const booking = await storage.getBooking(bookingId);
       
       if (!booking) {
@@ -91,17 +91,17 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Get pending department approvals
   app.get("/api/department-approvals", checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
     try {
-      console.log("GET /api/department-approvals - req.user:", req.user);
+      // console.log("GET /api/department-approvals - req.user:", req.user);
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
       const bookings = await storage.getBookingsByDepartment(req.user.department_id);
       
-      console.log("GET /api/department-approvals - Bookings from storage:", bookings);
+      // console.log("GET /api/department-approvals - Bookings from storage:", bookings);
       res.json(bookings);
     } catch (error) {
-      console.error("Error in /api/department-approvals:", error);
+      // console.error("Error in /api/department-approvals:", error);
       res.status(500).json({ message: "Failed to fetch department approvals" });
     }
   });
@@ -115,8 +115,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
-      console.log("Department approval request body:", req.body);
-      console.log("Department approver user ID:", req.user.id);
+      // console.log("Department approval request body:", req.body);
+      // console.log("Department approver user ID:", req.user.id);
 
       if (status !== BookingStatus.PENDING_ADMIN_APPROVAL && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
@@ -154,11 +154,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
       });
-      console.log("Booking data before creation:", bookingData);
+      // console.log("Booking data before creation:", bookingData);
       const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
-      console.error("Booking creation error:", error);
+      // console.error("Booking creation error:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -240,7 +240,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookings = await storage.getBookingsByStatus(BookingStatus.APPROVED);
       res.json(bookings);
     } catch (error) {
-      console.error("Failed to fetch approved bookings:", error);
+      // console.error("Failed to fetch approved bookings:", error);
       res.status(500).json({ message: "Failed to fetch approved bookings" });
     }
   });
@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       await fs.writeFile(filePath, JSON.stringify(data, null, 2));
       res.status(200).json({ message: "Logged successfully" });
     } catch (error) {
-      console.error("Failed to write log file:", error);
+      // console.error("Failed to write log file:", error);
       res.status(500).json({ message: "Failed to write log file" });
     }
   });

@@ -84,7 +84,7 @@ export class DatabaseStorage implements IStorage {
       const [user] = await this.dbClient.select().from(users).where(eq(users.email, email));
       return user;
     } catch (error) {
-      console.error(`Error in getUserByEmail for email ${email}:`, error);
+      // console.error(`Error in getUserByEmail for email ${email}:`, error);
       throw new Error("Failed to retrieve user by email.");
     }
   }
@@ -97,7 +97,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return user;
     } catch (error) {
-      console.error("Error in createUser:", error);
+      // console.error("Error in createUser:", error);
       throw new Error("Failed to create user.");
     }
   }
@@ -105,11 +105,14 @@ export class DatabaseStorage implements IStorage {
   // Booking Operations
   async getBooking(id: number): Promise<Booking | undefined> {
     try {
-      console.log("getBooking ID:", id);
-      const [booking] = await this.dbClient.select().from(bookings).where(eq(bookings.id, id));
+      // console.log("getBooking ID:", id);
+      const [booking] = await this.dbClient.select({
+        ...bookings,
+        departmentName: departments.name
+      }).from(bookings).where(eq(bookings.id, id)).leftJoin(departments, eq(bookings.department_id, departments.id));
       return booking;
     } catch (error) {
-      console.error(`Error in getBooking for ID ${id}:`, error);
+      // console.error(`Error in getBooking for ID ${id}:`, error);
       throw new Error("Failed to retrieve booking.");
     }
   }
@@ -121,7 +124,7 @@ export class DatabaseStorage implements IStorage {
         departmentName: departments.name
       }).from(bookings).where(eq(bookings.userId, userId)).leftJoin(departments, eq(bookings.department_id, departments.id));
     } catch (error) {
-      console.error(`Error in getBookingsByUserId for user ID ${userId}:`, error);
+      // console.error(`Error in getBookingsByUserId for user ID ${userId}:`, error);
       throw new Error("Failed to retrieve user bookings.");
     }
   }
@@ -133,31 +136,31 @@ export class DatabaseStorage implements IStorage {
         departmentName: departments.name
       }).from(bookings).where(eq(bookings.isDeleted, false)).leftJoin(departments, eq(bookings.department_id, departments.id));
     } catch (error) {
-      console.error("Error in getAllBookings:", error);
+      // console.error("Error in getAllBookings:", error);
       throw new Error("Failed to retrieve all bookings.");
     }
   }
 
   async getBookingsByStatus(status: BookingStatus): Promise<Booking[]> {
     try {
-      console.log(`Executing query for status: ${status}`);
+      // console.log(`Executing query for status: ${status}`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.status, status));
-      console.log('getBookingsByStatus result:', result);
+      // console.log('getBookingsByStatus result:', result);
       return result;
     } catch (error) {
-      console.error(`Error in getBookingsByStatus for status ${status}:`, error);
+      // console.error(`Error in getBookingsByStatus for status ${status}:`, error);
       throw new Error("Failed to retrieve bookings by status.");
     }
   }
 
   async getBookingsByDepartment(departmentId: number): Promise<Booking[]> {
     try {
-      console.log(`Executing query for departmentId: ${departmentId}`);
+      // console.log(`Executing query for departmentId: ${departmentId}`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.department_id, departmentId));
-      console.log('getBookingsByDepartment result:', result);
+      // console.log('getBookingsByDepartment result:', result);
       return result;
     } catch (error) {
-      console.error("Error in getBookingsByDepartment:", error);
+      // console.error("Error in getBookingsByDepartment:", error);
       throw new Error("Failed to retrieve department-specific bookings.");
     }
   }
@@ -170,7 +173,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error) {
-      console.error("Error in createBooking:", error);
+      // console.error("Error in createBooking:", error);
       throw new Error("Failed to create booking.");
     }
   }
@@ -178,7 +181,7 @@ export class DatabaseStorage implements IStorage {
   async updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined> {
     try {
       const { id, status, notes, approverId } = params;
-      console.log("updateBookingStatus params:", params);
+      // console.log("updateBookingStatus params:", params);
       const updateSet = {
           status, 
           ...(notes && { 
@@ -190,7 +193,7 @@ export class DatabaseStorage implements IStorage {
             departmentApprovalAt: new Date()
           }
         };
-      console.log("updateBookingStatus set object:", updateSet);
+      // console.log("updateBookingStatus set object:", updateSet);
       const [booking] = await this.dbClient
         .update(bookings)
         .set(updateSet)
@@ -198,7 +201,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error) {
-      console.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
+      // console.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
       throw new Error("Failed to update booking status.");
     }
   }
@@ -206,12 +209,12 @@ export class DatabaseStorage implements IStorage {
   async allocateRoom(params: RoomAllocation): Promise<Booking | undefined> {
     try {
       const { bookingId, roomNumber, notes } = params;
-      console.log("--- Allocating Room --- C: \Users\indan\Downloads\VFastBooker\VFastBooker\server\storage.ts");
-      console.log("Params:", params);
+      // console.log("--- Allocating Room --- C: \Users\indan\Downloads\VFastBooker\VFastBooker\server\storage.ts");
+      // console.log("Params:", params);
       
       // Verify room exists and is available
       const room = await this.getRoomByNumber(roomNumber);
-      console.log("Room before allocation:", room);
+      // console.log("Room before allocation:", room);
       if (!room || room.status !== RoomStatus.AVAILABLE) {
         throw new Error("Room not available");
       }
@@ -223,7 +226,7 @@ export class DatabaseStorage implements IStorage {
         
         // Update room availability
         const roomUpdateSet = { status: RoomStatus.OCCUPIED };
-        console.log("Updating room status to OCCUPIED");
+        // console.log("Updating room status to OCCUPIED");
         await this.dbClient
           .update(rooms)
           .set(roomUpdateSet)
@@ -231,7 +234,7 @@ export class DatabaseStorage implements IStorage {
           .execute();
 
         const updatedRoom = await this.getRoomByNumber(roomNumber);
-        console.log("Room after allocation:", updatedRoom);
+        // console.log("Room after allocation:", updatedRoom);
         
         // Update booking with allocated room and status
         const bookingUpdateSet = { 
@@ -239,7 +242,7 @@ export class DatabaseStorage implements IStorage {
             status: BookingStatus.ALLOCATED,
             vfastNotes: notes
           };
-        console.log("Updating booking status to ALLOCATED");
+        // console.log("Updating booking status to ALLOCATED");
         const [updatedBooking] = await this.dbClient
           .update(bookings)
           .set(bookingUpdateSet)
@@ -247,17 +250,17 @@ export class DatabaseStorage implements IStorage {
           .returning();
         
         await client.query('COMMIT');
-        console.log("--- Allocation Complete ---");
+        // console.log("--- Allocation Complete ---");
         return updatedBooking;
       } catch (error) {
         await client.query('ROLLBACK');
-        console.error("--- Allocation Failed: Transaction Rolled Back ---");
+        // console.error("--- Allocation Failed: Transaction Rolled Back ---");
         throw error;
       } finally {
         client.release();
       }
     } catch (error) {
-      console.error(`Error in allocateRoom for booking ID ${params.bookingId}:`, error);
+      // console.error(`Error in allocateRoom for booking ID ${params.bookingId}:`, error);
       throw new Error("Failed to allocate room.");
     }
   }
@@ -271,7 +274,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error) {
-      console.error(`Error in softDeleteBooking for ID ${id}:`, error);
+      // console.error(`Error in softDeleteBooking for ID ${id}:`, error);
       throw new Error("Failed to soft delete booking.");
     }
   }
@@ -282,7 +285,7 @@ export class DatabaseStorage implements IStorage {
       const [room] = await this.dbClient.select().from(rooms).where(eq(rooms.id, id));
       return room;
     } catch (error) {
-      console.error(`Error in getRoom for ID ${id}:`, error);
+      // console.error(`Error in getRoom for ID ${id}:`, error);
       throw new Error("Failed to retrieve room.");
     }
   }
@@ -292,7 +295,7 @@ export class DatabaseStorage implements IStorage {
       const [room] = await this.dbClient.select().from(rooms).where(eq(rooms.roomNumber, roomNumber));
       return room;
     } catch (error) {
-      console.error(`Error in getRoomByNumber for room number ${roomNumber}:`, error);
+      // console.error(`Error in getRoomByNumber for room number ${roomNumber}:`, error);
       throw new Error("Failed to retrieve room by number.");
     }
   }
@@ -301,7 +304,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(rooms);
     } catch (error) {
-      console.error("Error in getAllRooms:", error);
+      // console.error("Error in getAllRooms:", error);
       throw new Error("Failed to retrieve all rooms.");
     }
   }
@@ -318,7 +321,7 @@ export class DatabaseStorage implements IStorage {
           )
         );
     } catch (error) {
-      console.error(`Error in getAvailableRoomsByType for type ${type}:`, error);
+      // console.error(`Error in getAvailableRoomsByType for type ${type}:`, error);
       throw new Error("Failed to retrieve available rooms by type.");
     }
   }
@@ -329,10 +332,10 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(rooms)
         .where(eq(rooms.status, RoomStatus.AVAILABLE));
-      console.log("getAllAvailableRooms result:", availableRooms);
+      // console.log("getAllAvailableRooms result:", availableRooms);
       return availableRooms;
     } catch (error) {
-      console.error("Error in getAllAvailableRooms:", error);
+      // console.error("Error in getAllAvailableRooms:", error);
       throw new Error("Failed to retrieve all available rooms.");
     }
   }
@@ -345,7 +348,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return room;
     } catch (error) {
-      console.error("Error in createRoom:", error);
+      // console.error("Error in createRoom:", error);
       throw new Error("Failed to create room.");
     }
   }
@@ -359,7 +362,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return room;
     } catch (error) {
-      console.error(`Error in updateRoomStatus for ID ${id}:`, error);
+      // console.error(`Error in updateRoomStatus for ID ${id}:`, error);
       throw new Error("Failed to update room status.");
     }
   }
@@ -369,7 +372,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(departments);
     } catch (error) {
-      console.error("Error in getAllDepartments:", error);
+      // console.error("Error in getAllDepartments:", error);
       throw new Error("Failed to retrieve all departments.");
     }
   }

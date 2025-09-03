@@ -38,7 +38,7 @@ const fetchDepartmentApprovals = async (): Promise<Booking[]> => {
     throw new Error("Failed to fetch department approvals");
   }
   const data = await response.json();
-  console.log("Raw response from /api/department-approvals:", data);
+  // console.log("Raw response from /api/department-approvals:", data);
   return data;
 };
 // TODO: Ensure /api/department-approvals returns allocated bookings for the 'Allocated Rooms' metric on the department approver dashboard to function correctly.
