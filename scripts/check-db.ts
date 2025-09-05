@@ -1,28 +1,18 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-const { Pool } = pg;
-import 'dotenv/config';
+import { pool } from '../server/db';
 
-async function main() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
-
-  const db = drizzle(pool);
-
-  console.log('Checking database connection...');
-
-  // Get all table names
-  const tableNames = await db.execute(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
-  );
-
-  console.log('Tables in database:', tableNames.rows);
-
-  pool.end();
+async function checkDb() {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(`
+      SELECT tablename
+      FROM pg_catalog.pg_tables
+      WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema';
+    `);
+    console.log('Tables in database:', res.rows.map(r => r.tablename));
+  } finally {
+    client.release();
+    pool.end();
+  }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+checkDb();

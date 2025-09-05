@@ -30,9 +30,9 @@ export interface IStorage {
   getBookingsByDepartment(departmentId: number): Promise<Booking[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined>;
+  reconsiderBooking(bookingId: number, bookingData: InsertBooking): Promise<Booking | undefined>;
+  softDeleteBooking(id: number): Promise<Booking | undefined>;
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
-  
-  // Room operations
   
   // Room operations
   getRoom(id: number): Promise<Room | undefined>;
@@ -75,7 +75,7 @@ export class DatabaseStorage implements IStorage {
       const [user] = await this.dbClient.select().from(users).where(eq(users.id, id));
       return user;
     } catch (error) {
-      
+      console.error(`Error in getUser for ID ${id}:`, error);
       throw new Error("Failed to retrieve user.");
     }
   }
@@ -85,7 +85,7 @@ export class DatabaseStorage implements IStorage {
       const [user] = await this.dbClient.select().from(users).where(eq(users.email, email));
       return user;
     } catch (error) {
-      // console.error(`Error in getUserByEmail for email ${email}:`, error);
+      console.error(`Error in getUserByEmail for email ${email}:`, error);
       throw new Error("Failed to retrieve user by email.");
     }
   }
@@ -120,10 +120,12 @@ export class DatabaseStorage implements IStorage {
 
   async getBookingsByUserId(userId: number): Promise<any[]> {
     try {
-      return await this.dbClient.select({
+      const result = await this.dbClient.select({
         ...bookings,
         departmentName: departments.name
       }).from(bookings).where(eq(bookings.userId, userId)).leftJoin(departments, eq(bookings.department_id, departments.id));
+      console.log('getBookingsByUserId result:', result);
+      return result;
     } catch (error) {
       // console.error(`Error in getBookingsByUserId for user ID ${userId}:`, error);
       throw new Error("Failed to retrieve user bookings.");
@@ -174,7 +176,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error) {
-      // console.error("Error in createBooking:", error);
+      // console.error("Storage: Error in createBooking:", error);
       throw new Error("Failed to create booking.");
     }
   }
@@ -182,19 +184,45 @@ export class DatabaseStorage implements IStorage {
   async updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined> {
     try {
       const { id, status, notes, approverId } = params;
-      // console.log("updateBookingStatus params:", params);
-      const updateSet = {
-          status, 
-          ...(notes && { 
-            adminNotes: status === BookingStatus.APPROVED || status === BookingStatus.REJECTED ? notes : undefined,
-            vfastNotes: status === BookingStatus.ALLOCATED ? notes : undefined 
-          }),
-          ...(status === BookingStatus.PENDING_ADMIN_APPROVAL || status === BookingStatus.REJECTED) && {
-            departmentApproverId: approverId,
-            departmentApprovalAt: new Date()
-          }
+      
+      const currentBooking = await this.getBooking(id);
+      if (!currentBooking) {
+        throw new Error("Booking not found");
+      }
+
+      const updateSet: Partial<Booking> = { status };
+      
+      if (status === BookingStatus.REJECTED) {
+        const rejectionEntry = {
+          reason: notes,
+          rejectedBy: approverId,
+          rejectedAt: new Date(),
         };
-      // console.log("updateBookingStatus set object:", updateSet);
+        updateSet.rejectionHistory = [...(currentBooking.rejectionHistory || []), rejectionEntry];
+        updateSet.status = BookingStatus.PENDING_RECONSIDERATION;
+      } else if (status === BookingStatus.PENDING_ADMIN_APPROVAL) {
+        updateSet.departmentApproverId = approverId;
+        updateSet.departmentApprovalAt = new Date();
+      } else if (status === BookingStatus.APPROVED) {
+        updateSet.adminApproverId = approverId;
+        updateSet.adminApprovalAt = new Date();
+      }
+
+      if (approverId) {
+        const approver = await this.getUser(approverId);
+        if (!approver) {
+          throw new Error("Approver not found");
+        }
+
+        if (notes) {
+          if (approver.role === 'admin') {
+            updateSet.adminNotes = notes;
+          } else if (approver.role === 'vfast') {
+            updateSet.vfastNotes = notes;
+          }
+        }
+      }
+
       const [booking] = await this.dbClient
         .update(bookings)
         .set(updateSet)
@@ -206,6 +234,48 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Failed to update booking status.");
     }
   }
+
+  async reconsiderBooking(bookingId: number, bookingData: InsertBooking): Promise<Booking | undefined> {
+    try {
+      const originalBooking = await this.getBooking(bookingId);
+      if (!originalBooking) {
+        throw new Error("Original booking not found");
+      }
+
+      const [reconsideredBooking] = await this.dbClient
+        .update(bookings)
+        .set({
+          ...bookingData,
+          status: BookingStatus.PENDING_DEPARTMENT_APPROVAL,
+          isReconsidered: true,
+          reconsiderationCount: (originalBooking.reconsiderationCount || 0) + 1,
+          reconsideredFromId: bookingId,
+        })
+        .where(eq(bookings.id, bookingId))
+        .returning();
+
+      return reconsideredBooking;
+    } catch (error) {
+      // console.error(`Error in reconsiderBooking for booking ID ${bookingId}:`, error);
+      throw new Error("Failed to reconsider booking.");
+    }
+  }
+
+  async softDeleteBooking(id: number): Promise<Booking | undefined> {
+    try {
+      const [booking] = await this.dbClient
+        .update(bookings)
+        .set({ isDeleted: true })
+        .where(eq(bookings.id, id))
+        .returning();
+      return booking;
+    } catch (error) {
+      // console.error(`Error in softDeleteBooking for ID ${id}:`, error);
+      throw new Error("Failed to soft delete booking.");
+    }
+  }
+
+
 
   async allocateRoom(params: RoomAllocation): Promise<Booking | undefined> {
     try {
@@ -266,19 +336,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async softDeleteBooking(id: number): Promise<Booking | undefined> {
-    try {
-      const [booking] = await this.dbClient
-        .update(bookings)
-        .set({ isDeleted: true })
-        .where(eq(bookings.id, id))
-        .returning();
-      return booking;
-    } catch (error) {
-      // console.error(`Error in softDeleteBooking for ID ${id}:`, error);
-      throw new Error("Failed to soft delete booking.");
-    }
-  }
+
 
   // Room Operations
   async getRoom(id: number): Promise<Room | undefined> {

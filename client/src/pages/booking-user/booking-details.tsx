@@ -11,6 +11,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
+import ReconsiderationButton from "@/components/booking/reconsideration-button";
+import { BookingStatus } from "@shared/schema";
+
 export default function BookingDetailsPage() {
   const { toast } = useToast();
   const params = useParams<{ id: string }>();
@@ -102,6 +105,11 @@ export default function BookingDetailsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {booking.status === BookingStatus.PENDING_RECONSIDERATION && (
+              <div className="flex justify-end">
+                <ReconsiderationButton booking={booking} />
+              </div>
+            )}
             <div className="flex items-start space-x-3">
               <Calendar className="h-5 w-5 text-primary mt-0.5" />
               <div>
@@ -159,6 +167,21 @@ export default function BookingDetailsPage() {
                 <div>
                   <p className="font-medium">Special Requests</p>
                   <p className="text-gray-600">{booking.specialRequests}</p>
+                </div>
+              </div>
+            )}
+
+            {booking.rejectionHistory && booking.rejectionHistory.length > 0 && (
+              <div className="flex items-start space-x-3">
+                <FileText className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                  <p className="font-medium">Rejection History</p>
+                  {booking.rejectionHistory.map((rejection: any, index: number) => (
+                    <div key={index} className="mb-2">
+                      <p className="text-xs text-gray-500">Rejected on {formatDate(new Date(rejection.rejectedAt))}</p>
+                      <p className="text-gray-600">Reason: {rejection.reason}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

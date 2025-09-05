@@ -13,24 +13,24 @@ export default function ReconsiderationButton({ booking }: ReconsiderationButton
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/bookings/${booking.id}/status`, { status: BookingStatus.PENDING_RECONSIDERATION });
+      const res = await apiRequest("POST", `/api/bookings/${booking.id}/resubmit`, { ...booking, status: BookingStatus.PENDING_DEPARTMENT_APPROVAL });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to request reconsideration");
+        throw new Error(errorData.message || "Failed to resubmit booking");
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/my-bookings"] });
       toast({
-        title: "Reconsideration Requested",
-        description: "Your request for reconsideration has been submitted.",
+        title: "Booking Resubmitted",
+        description: "Your booking has been resubmitted for approval.",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to request reconsideration.",
+        description: error.message || "Failed to resubmit booking.",
         variant: "destructive",
       });
     },
@@ -38,7 +38,7 @@ export default function ReconsiderationButton({ booking }: ReconsiderationButton
 
   return (
     <Button size="sm" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-      {mutation.isPending ? "Submitting..." : "Request Reconsideration"}
+      {mutation.isPending ? "Resubmitting..." : "Resubmit Booking"}
     </Button>
   );
 }

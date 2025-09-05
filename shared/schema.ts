@@ -87,7 +87,11 @@ export const bookings = pgTable("bookings", {
   adminApprovalAt: timestamp("admin_approval_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
+  rejectionHistory: json("rejection_history").default([]),
+  isReconsidered: boolean("is_reconsidered").default(false),
+  reconsiderationCount: integer("reconsideration_count").default(0),
+  reconsideredFromId: integer("reconsidered_from_id"),
+  isDeleted: boolean("is_deleted").default(false),
 });
 
 // Insert schema for booking creation
@@ -98,7 +102,16 @@ export const insertBookingSchema = createInsertSchema(bookings)
     adminNotes: true, 
     vfastNotes: true, 
     createdAt: true, 
-    updatedAt: true 
+    updatedAt: true,
+    departmentApproverId: true,
+    adminApproverId: true,
+    departmentApprovalAt: true,
+    adminApprovalAt: true,
+    rejectionHistory: true,
+    isReconsidered: true,
+    reconsiderationCount: true,
+    reconsideredFromId: true,
+    isDeleted: true,
   });
 
 // Update schema for booking status

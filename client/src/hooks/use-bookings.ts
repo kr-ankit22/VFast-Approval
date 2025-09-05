@@ -135,3 +135,29 @@ export const useGetDepartments = () => {
     queryFn: fetchDepartments,
   });
 };
+
+const resubmitBooking = async (data: { id: number, booking: Booking }): Promise<Booking> => {
+  const response = await fetch(`/api/bookings/${data.id}/resubmit`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data.booking),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to resubmit booking");
+  }
+  return response.json();
+};
+
+export const useResubmitBooking = () => {
+  const queryClient = useQueryClient();
+  return useMutation<Booking, Error, { id: number, booking: Booking }>({
+    mutationFn: resubmitBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    },
+  });
+};

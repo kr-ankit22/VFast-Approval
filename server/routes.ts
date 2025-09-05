@@ -115,8 +115,6 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
-      // console.log("Department approval request body:", req.body);
-      // console.log("Department approver user ID:", req.user.id);
 
       if (status !== BookingStatus.PENDING_ADMIN_APPROVAL && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
@@ -173,8 +171,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       const statusData = updateBookingStatusSchema.parse({
         id: bookingId,
-        status: req.body.status === BookingStatus.REJECTED ? BookingStatus.PENDING_RECONSIDERATION : req.body.status,
-        notes: req.body.notes
+        status: req.body.status,
+        notes: req.body.notes,
+        approverId: req.user.id
       });
       
       const booking = await storage.updateBookingStatus(statusData);
@@ -193,32 +192,23 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-    app.patch("/api/bookings/:id/soft-delete", checkRole([UserRole.ADMIN]), async (req, res) => {
-    try {
-      const bookingId = parseInt(req.params.id);
-      const booking = await storage.softDeleteBooking(bookingId);
-      
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-      
-      res.json(booking);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete booking" });
-    }
-  });
+    
 
-  // Reconsider booking (Booking users)
-  app.patch("/api/bookings/:id/reconsider", checkRole([UserRole.BOOKING]), async (req, res) => {
+  // Resubmit booking (Booking users)
+  app.post("/api/bookings/:id/resubmit", checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const bookingId = parseInt(req.params.id);
-      const bookingData = insertBookingSchema.parse({
+      const bookingData = {
         ...req.body,
-        userId: req.user.id, // Ensure user ID is correct
-        status: BookingStatus.PENDING_DEPARTMENT_APPROVAL, // Reset status for reconsideration
+        userId: req.user.id,
+        status: BookingStatus.PENDING_DEPARTMENT_APPROVAL, // Explicitly set status
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
-      });
+      };
 
       const booking = await storage.reconsiderBooking(bookingId, bookingData);
 
@@ -232,7 +222,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      res.status(500).json({ message: "Failed to reconsider booking" });
+      res.status(500).json({ message: "Failed to resubmit booking" });
     }
   });
 
@@ -276,7 +266,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Get reconsideration requests (for VFast review)
   app.get("/api/bookings/reconsideration", checkRole([UserRole.VFAST]), async (req, res) => {
     try {
-      const bookings = await storage.getBookingsByStatus(BookingStatus.REJECTED);
+      const bookings = await storage.getBookingsByStatus(BookingStatus.PENDING_RECONSIDERATION);
       res.json(bookings);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch reconsideration requests" });

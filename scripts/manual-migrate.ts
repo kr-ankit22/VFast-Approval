@@ -1,42 +1,59 @@
-import { Pool } from 'pg';
-import 'dotenv/config';
-import fs from 'fs/promises';
+import { pool } from '../server/db';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 async function main() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
-
-  console.log('Connecting to database...');
   const client = await pool.connect();
-  console.log('Connected to database.');
-
   try {
-    console.log('Starting manual migration...');
+    // 1. Create migrations table if it doesn't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
 
-    const migrationFiles = [
-      'migrations/0000_certain_vector.sql',
-      'migrations/0001_absent_lady_vermin.sql',
-      'migrations/0002_add_room_status.sql',
-    ];
+    // 2. Get all applied migrations
+    const appliedMigrationsResult = await client.query('SELECT name FROM migrations');
+    const appliedMigrations = appliedMigrationsResult.rows.map(r => r.name);
 
-    for (const file of migrationFiles) {
-      console.log(`Executing migration: ${file}`);
-      const sql = await fs.readFile(file, 'utf-8');
-      await client.query(sql);
-      console.log(`Finished executing: ${file}`);
+    // 3. Get all migration files
+    const migrationsDir = path.join(__dirname, '../migrations');
+    const migrationFiles = (await fs.readdir(migrationsDir)).filter(f => f.endsWith('.sql'));
+
+    // 4. Determine and apply pending migrations
+    const pendingMigrations = migrationFiles.filter(f => !appliedMigrations.includes(f));
+
+    if (pendingMigrations.length === 0) {
+      console.log('No pending migrations.');
+      return;
     }
 
-    console.log('Manual migration complete.');
-  } catch (error) {
-    console.error('Error during manual migration:', error);
+    console.log('Applying pending migrations:', pendingMigrations);
+
+    for (const migrationFile of pendingMigrations) {
+      console.log(`Applying migration: ${migrationFile}`);
+      const sql = await fs.readFile(path.join(migrationsDir, migrationFile), 'utf-8');
+      await client.query(sql);
+      await client.query('INSERT INTO migrations (name) VALUES ($1)', [migrationFile]);
+    }
+
+    console.log('All pending migrations applied successfully.');
+
   } finally {
     client.release();
     pool.end();
   }
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch(err => {
+  console.error('Migration failed:', err);
   process.exit(1);
 });

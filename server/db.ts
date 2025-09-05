@@ -9,8 +9,11 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+console.log("DATABASE_URL:", process.env.DATABASE_URL);
 // Create a connection pool
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+console.log("Database pool created.");
 
 // Create a drizzle instance with our schema
 export const db = drizzle(pool, { schema, logger: false });
+console.log("Drizzle instance created.");
