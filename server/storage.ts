@@ -1,13 +1,20 @@
-import { 
+import {
   User, InsertUser,
   Booking, InsertBooking, UpdateBookingStatus, RoomAllocation,
   Room, InsertRoom, RoomStatus,
   BookingStatus,
   Department,
+  Guest, InsertGuest,
+  RoomMaintenance, InsertRoomMaintenance,
+  GuestNote, InsertGuestNote,
+  GuestCheckInStatus, WorkflowStage, RoomMaintenanceStatus,
   users,
   bookings,
   departments,
-  rooms
+  rooms,
+  guests,
+  roomMaintenance,
+  guestNotes
 } from "@shared/schema";
 import { eq, and, or, lt, gt, lte, gte } from "drizzle-orm";
 import session from "express-session";
@@ -33,9 +40,21 @@ export interface IStorage {
   updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined>;
   reconsiderBooking(bookingId: number, bookingData: InsertBooking): Promise<Booking | undefined>;
   getBookingJourney(bookingId: number): Promise<any>;
+  updateBookingWorkflowStage(bookingId: number, stage: WorkflowStage, checkInStatus?: GuestCheckInStatus): Promise<Booking | undefined>;
+  getBookingsByWorkflowStage(stage: WorkflowStage): Promise<Booking[]>;
   
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
   
+  // Guest operations
+  createGuest(guest: InsertGuest): Promise<Guest>;
+  getGuestsByBookingId(bookingId: number): Promise<Guest[]>;
+  updateGuest(guestId: number, updates: Partial<Guest>): Promise<Guest | undefined>;
+  deleteGuest(guestId: number): Promise<void>;
+
+  // Guest Note operations
+  createGuestNote(note: InsertGuestNote): Promise<GuestNote>;
+  getGuestNotesByGuestId(guestId: number): Promise<GuestNote[]>;
+
   // Room operations
   getRoom(id: number): Promise<Room | undefined>;
   getRoomByNumber(roomNumber: string): Promise<Room | undefined>;
@@ -45,6 +64,12 @@ export interface IStorage {
   createRoom(room: InsertRoom): Promise<Room>;
   updateRoomStatus(id: number, status: RoomStatus): Promise<Room | undefined>;
   
+  // Room Maintenance operations
+  createRoomMaintenance(maintenance: InsertRoomMaintenance): Promise<RoomMaintenance>;
+  updateRoomMaintenanceStatus(id: number, status: RoomMaintenanceStatus): Promise<RoomMaintenance | undefined>;
+  getRoomMaintenanceByRoomId(roomId: number): Promise<RoomMaintenance[]>;
+  getActiveRoomMaintenance(): Promise<RoomMaintenance[]>;
+
   // Session store
   sessionStore: session.Store;
 
@@ -172,6 +197,18 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getBookingsByWorkflowStage(stage: WorkflowStage): Promise<Booking[]> {
+    try {
+      console.log(`Executing query for workflow stage: ${stage}`);
+      const result = await this.dbClient.select().from(bookings).where(eq(bookings.currentWorkflowStage, stage));
+      console.log('getBookingsByWorkflowStage result:', result);
+      return result;
+    } catch (error) {
+      console.error(`Error in getBookingsByWorkflowStage for stage ${stage}:`, error);
+      throw new Error("Failed to retrieve bookings by workflow stage.");
+    }
+  }
+
   async getBookingsByDepartment(departmentId: number): Promise<Booking[]> {
     try {
       // console.log(`Executing query for departmentId: ${departmentId}`);
@@ -216,12 +253,16 @@ export class DatabaseStorage implements IStorage {
         };
         updateSet.rejectionHistory = [...(currentBooking.rejectionHistory || []), rejectionEntry];
         updateSet.status = BookingStatus.PENDING_RECONSIDERATION;
+        updateSet.currentWorkflowStage = WorkflowStage.REJECTED;
       } else if (status === BookingStatus.PENDING_ADMIN_APPROVAL) {
         updateSet.departmentApproverId = approverId;
         updateSet.departmentApprovalAt = new Date();
       } else if (status === BookingStatus.APPROVED) {
         updateSet.adminApproverId = approverId;
         updateSet.adminApprovalAt = new Date();
+        updateSet.currentWorkflowStage = WorkflowStage.ALLOCATION_PENDING; // Ready for allocation
+      } else if (status === BookingStatus.ALLOCATED) {
+        updateSet.currentWorkflowStage = WorkflowStage.ALLOCATED;
       }
 
       if (approverId) {
@@ -356,6 +397,24 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async updateBookingWorkflowStage(bookingId: number, stage: WorkflowStage, checkInStatus?: GuestCheckInStatus): Promise<Booking | undefined> {
+    try {
+      const updateSet: Partial<Booking> = { currentWorkflowStage: stage };
+      if (checkInStatus) {
+        updateSet.checkInStatus = checkInStatus;
+      }
+      const [booking] = await this.dbClient
+        .update(bookings)
+        .set(updateSet)
+        .where(eq(bookings.id, bookingId))
+        .returning();
+      return booking;
+    } catch (error) {
+      console.error(`Error in updateBookingWorkflowStage for ID ${bookingId}:`, error);
+      throw new Error("Failed to update booking workflow stage.");
+    }
+  }
+
   
 
 
@@ -393,10 +452,21 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Room is already booked for the selected dates.");
       }
 
-      // Verify room exists and is available
+      // Verify room exists and is available and not under maintenance
       const room = await this.getRoomByNumber(roomNumber);
       if (!room || room.status !== RoomStatus.AVAILABLE) {
         throw new Error("Room not available");
+      }
+
+      const activeMaintenance = await this.dbClient.select().from(roomMaintenance).where(
+        and(
+          eq(roomMaintenance.roomId, room.id),
+          eq(roomMaintenance.status, RoomMaintenanceStatus.IN_PROGRESS)
+        )
+      );
+
+      if (activeMaintenance.length > 0) {
+        throw new Error("Room is currently under maintenance and cannot be allocated.");
       }
       
       // Begin transaction
@@ -436,6 +506,75 @@ export class DatabaseStorage implements IStorage {
       }
     } catch (error) {
       throw new Error("Failed to allocate room.");
+    }
+  }
+
+  // Guest Operations
+  async createGuest(insertGuest: InsertGuest): Promise<Guest> {
+    try {
+      const [guest] = await this.dbClient
+        .insert(guests)
+        .values(insertGuest)
+        .returning();
+      return guest;
+    } catch (error) {
+      console.error("Error in createGuest:", error);
+      throw new Error("Failed to create guest.");
+    }
+  }
+
+  async getGuestsByBookingId(bookingId: number): Promise<Guest[]> {
+    try {
+      return await this.dbClient.select().from(guests).where(eq(guests.bookingId, bookingId));
+    } catch (error) {
+      console.error(`Error in getGuestsByBookingId for booking ID ${bookingId}:`, error);
+      throw new Error("Failed to retrieve guests for booking.");
+    }
+  }
+
+  async updateGuest(guestId: number, updates: Partial<Guest>): Promise<Guest | undefined> {
+    try {
+      const [guest] = await this.dbClient
+        .update(guests)
+        .set(updates)
+        .where(eq(guests.id, guestId))
+        .returning();
+      return guest;
+    } catch (error) {
+      console.error(`Error in updateGuest for ID ${guestId}:`, error);
+      throw new Error("Failed to update guest.");
+    }
+  }
+
+  async deleteGuest(guestId: number): Promise<void> {
+    try {
+      await this.dbClient.delete(guests).where(eq(guests.id, guestId));
+    } catch (error) {
+      console.error(`Error in deleteGuest for ID ${guestId}:`, error);
+      throw new Error("Failed to delete guest.");
+    }
+  }
+
+  // Guest Note Operations
+  async createGuestNote(insertNote: InsertGuestNote): Promise<GuestNote> {
+    try {
+      const [note] = await this.dbClient
+        .insert(guestNotes)
+        .values(insertNote)
+        .returning();
+      return note;
+    } catch (error) {
+      console.error("Error in createGuestNote:", error);
+      throw new Error("Failed to create guest note.");
+    }
+  }
+
+  async getGuestNotesByGuestId(guestId: number): Promise<GuestNote[]> {
+    try {
+      return await this.dbClient.select().from(guestNotes).where(eq(guestNotes.guestId, guestId)).orderBy(guestNotes.timestamp);
+    } catch (error) {
+      console.error(`Error in getGuestNotesByGuestId for guest ID ${guestId}:`, error);
+      throw new Error("Failed to retrieve guest notes.");
     }
   }
 
@@ -526,6 +665,52 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       // console.error(`Error in updateRoomStatus for ID ${id}:`, error);
       throw new Error("Failed to update room status.");
+    }
+  }
+
+  // Room Maintenance Operations
+  async createRoomMaintenance(insertMaintenance: InsertRoomMaintenance): Promise<RoomMaintenance> {
+    try {
+      const [maintenance] = await this.dbClient
+        .insert(roomMaintenance)
+        .values(insertMaintenance)
+        .returning();
+      return maintenance;
+    } catch (error) {
+      console.error("Error in createRoomMaintenance:", error);
+      throw new Error("Failed to create room maintenance entry.");
+    }
+  }
+
+  async updateRoomMaintenanceStatus(id: number, status: RoomMaintenanceStatus): Promise<RoomMaintenance | undefined> {
+    try {
+      const [maintenance] = await this.dbClient
+        .update(roomMaintenance)
+        .set({ status })
+        .where(eq(roomMaintenance.id, id))
+        .returning();
+      return maintenance;
+    } catch (error) {
+      console.error(`Error in updateRoomMaintenanceStatus for ID ${id}:`, error);
+      throw new Error("Failed to update room maintenance status.");
+    }
+  }
+
+  async getRoomMaintenanceByRoomId(roomId: number): Promise<RoomMaintenance[]> {
+    try {
+      return await this.dbClient.select().from(roomMaintenance).where(eq(roomMaintenance.roomId, roomId));
+    } catch (error) {
+      console.error(`Error in getRoomMaintenanceByRoomId for room ID ${roomId}:`, error);
+      throw new Error("Failed to retrieve room maintenance entries.");
+    }
+  }
+
+  async getActiveRoomMaintenance(): Promise<RoomMaintenance[]> {
+    try {
+      return await this.dbClient.select().from(roomMaintenance).where(eq(roomMaintenance.status, RoomMaintenanceStatus.IN_PROGRESS));
+    } catch (error) {
+      console.error("Error in getActiveRoomMaintenance:", error);
+      throw new Error("Failed to retrieve active room maintenance entries.");
     }
   }
 

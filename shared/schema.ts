@@ -32,6 +32,28 @@ export enum RoomStatus {
   RESERVED = "reserved",
 }
 
+// Guest Check-in Status enum
+export enum GuestCheckInStatus {
+  PENDING_CHECK_IN = "pending_check_in",
+  CHECKED_IN = "checked_in",
+  CHECKED_OUT = "checked_out",
+}
+
+// Booking Workflow Stage enum
+export enum WorkflowStage {
+  ALLOCATION_PENDING = "allocation_pending",
+  ALLOCATED = "allocated",
+  CHECKED_IN = "checked_in",
+  CHECKED_OUT = "checked_out",
+  REJECTED = "rejected",
+}
+
+// Room Maintenance Status enum
+export enum RoomMaintenanceStatus {
+  IN_PROGRESS = "in_progress",
+  COMPLETED = "completed",
+}
+
 // Departments table
 export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
@@ -92,6 +114,8 @@ export const bookings = pgTable("bookings", {
   reconsiderationCount: integer("reconsideration_count").default(0),
   reconsideredFromId: integer("reconsidered_from_id"),
   isDeleted: boolean("is_deleted").default(false),
+  currentWorkflowStage: text("current_workflow_stage").notNull().default(WorkflowStage.ALLOCATION_PENDING),
+  checkInStatus: text("check_in_status").notNull().default(GuestCheckInStatus.PENDING_CHECK_IN),
 });
 
 // Insert schema for booking creation
@@ -112,6 +136,8 @@ export const insertBookingSchema = createInsertSchema(bookings)
     reconsiderationCount: true,
     reconsideredFromId: true,
     isDeleted: true,
+    currentWorkflowStage: true,
+    checkInStatus: true,
   });
 
 // Update schema for booking status
@@ -164,3 +190,42 @@ export type Room = typeof rooms.$inferSelect;
 export type InsertRoom = z.infer<typeof insertRoomSchema>;
 
 export type Department = typeof departments.$inferSelect;
+
+export const guests = pgTable("guests", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  contact: text("contact"),
+  kycDocumentUrl: text("kyc_document_url"),
+  isVerified: boolean("is_verified").notNull().default(false),
+  checkedIn: boolean("checked_in").notNull().default(false),
+  checkInTime: timestamp("check_in_time"),
+  checkOutTime: timestamp("check_out_time"),
+});
+
+export const roomMaintenance = pgTable("room_maintenance", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull().references(() => rooms.id, { onDelete: "cascade" }),
+  reason: text("reason").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  status: text("status").notNull().default(RoomMaintenanceStatus.IN_PROGRESS),
+});
+
+export type Guest = typeof guests.$inferSelect;
+export type InsertGuest = typeof guests.$inferInsert;
+
+export type RoomMaintenance = typeof roomMaintenance.$inferSelect;
+export type InsertRoomMaintenance = typeof roomMaintenance.$inferInsert;
+
+// Guest Notes table
+export const guestNotes = pgTable("guest_notes", {
+  id: serial("id").primaryKey(),
+  guestId: integer("guest_id").notNull().references(() => guests.id, { onDelete: "cascade" }),
+  note: text("note").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+  type: text("type"),
+});
+
+export type GuestNote = typeof guestNotes.$inferSelect;
+export type InsertGuestNote = typeof guestNotes.$inferInsert;

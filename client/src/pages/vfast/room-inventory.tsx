@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useGetRooms } from "@/hooks/use-bookings";
-import { Room, RoomStatus } from "@shared/schema";
+import { Room, RoomStatus, RoomMaintenanceStatus } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -23,20 +23,46 @@ import {
   Wifi,
   Tv,
   Wind,
-  RefrigeratorIcon
+  RefrigeratorIcon,
+  CalendarDays
 } from "lucide-react";
 import { UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const maintenanceFormSchema = z.object({
+  reason: z.string().min(10, "Reason must be at least 10 characters.").max(500, "Reason cannot exceed 500 characters."),
+  startDate: z.date({
+    required_error: "Start date is required.",
+  }),
+  endDate: z.date().optional(),
+});
 
 export default function VFastRoomInventory() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [isMaintenanceDialogOpen, setIsMaintenanceDialogOpen] = useState(false);
+  const [selectedRoomForMaintenance, setSelectedRoomForMaintenance] = useState<Room | null>(null);
 
   const { data: rooms, isLoading, isError, error } = useGetRooms();
+
+  const { data: activeMaintenance, isLoading: isLoadingMaintenance } = useQuery<any[]>({
+    queryKey: ["/api/rooms/maintenance/active"],
+    refetchInterval: 5000,
+  });
 
   const updateRoomStatusMutation = useMutation({
     mutationFn: async (data: { id: number; status: RoomStatus }) => {
@@ -60,8 +86,71 @@ export default function VFastRoomInventory() {
     },
   });
 
+  const createMaintenanceMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof maintenanceFormSchema> & { roomId: number }) => {
+      const res = await apiRequest("POST", `/api/rooms/${data.roomId}/maintenance`, data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create maintenance entry");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms/maintenance/active"] });
+      toast({
+        title: "Maintenance Scheduled",
+        description: "Room successfully marked for maintenance.",
+      });
+      setIsMaintenanceDialogOpen(false);
+      setSelectedRoomForMaintenance(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to schedule maintenance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeMaintenanceMutation = useMutation({
+    mutationFn: async (maintenanceId: number) => {
+      const res = await apiRequest("PATCH", `/api/room-maintenance/${maintenanceId}/status`, { status: RoomMaintenanceStatus.COMPLETED });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to complete maintenance");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms/maintenance/active"] });
+      toast({
+        title: "Maintenance Completed",
+        description: "Room maintenance marked as complete.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to complete maintenance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleMarkAsReserved = (room: Room) => {
     updateRoomStatusMutation.mutate({ id: room.id, status: RoomStatus.RESERVED });
+  };
+
+  const handleMarkForMaintenance = (room: Room) => {
+    setSelectedRoomForMaintenance(room);
+    setIsMaintenanceDialogOpen(true);
+  };
+
+  const handleCompleteMaintenance = (maintenanceId: number) => {
+    completeMaintenanceMutation.mutate(maintenanceId);
   };
 
   // Filter rooms based on active tab and search term
@@ -83,11 +172,31 @@ export default function VFastRoomInventory() {
         room.floor.toString().includes(searchLower)
       );
     }
-    
-    return filtered;
+
+    // Attach maintenance status
+    return filtered.map(room => ({
+      ...room,
+      isUnderMaintenance: activeMaintenance?.some(m => m.roomId === room.id && m.status === RoomMaintenanceStatus.IN_PROGRESS) || false,
+      maintenanceId: activeMaintenance?.find(m => m.roomId === room.id && m.status === RoomMaintenanceStatus.IN_PROGRESS)?.id || null,
+    }));
   };
 
   const filteredRooms = getFilteredRooms();
+
+  const maintenanceForm = useForm<z.infer<typeof maintenanceFormSchema>>({
+    resolver: zodResolver(maintenanceFormSchema),
+    defaultValues: {
+      reason: "",
+      startDate: new Date(),
+      endDate: undefined,
+    },
+  });
+
+  const onSubmitMaintenance = (values: z.infer<typeof maintenanceFormSchema>) => {
+    if (selectedRoomForMaintenance) {
+      createMaintenanceMutation.mutate({ ...values, roomId: selectedRoomForMaintenance.id });
+    }
+  };
 
   // Get floor display
   const getFloorDisplay = (floor: number) => {
@@ -206,7 +315,9 @@ export default function VFastRoomInventory() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {room.status === RoomStatus.AVAILABLE ? (
+                        {room.isUnderMaintenance ? (
+                          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Under Maintenance</Badge>
+                        ) : room.status === RoomStatus.AVAILABLE ? (
                           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Available</Badge>
                         ) : room.status === RoomStatus.OCCUPIED ? (
                           <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Occupied</Badge>
@@ -216,14 +327,35 @@ export default function VFastRoomInventory() {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleMarkAsReserved(room)}
-                            disabled={room.status === RoomStatus.RESERVED}
-                          >
-                            Mark as Reserved
-                          </Button>
+                          {room.isUnderMaintenance ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => room.maintenanceId && handleCompleteMaintenance(room.maintenanceId)}
+                              disabled={completeMaintenanceMutation.isPending}
+                            >
+                              {completeMaintenanceMutation.isPending ? "Completing..." : "Complete Maintenance"}
+                            </Button>
+                          ) : (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleMarkAsReserved(room)}
+                                disabled={room.status === RoomStatus.RESERVED}
+                              >
+                                Mark as Reserved
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleMarkForMaintenance(room)}
+                                disabled={room.status !== RoomStatus.AVAILABLE}
+                              >
+                                Mark for Maintenance
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -241,6 +373,125 @@ export default function VFastRoomInventory() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Maintenance Dialog */}
+      {selectedRoomForMaintenance && (
+        <Dialog open={isMaintenanceDialogOpen} onOpenChange={setIsMaintenanceDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Mark Room {selectedRoomForMaintenance.roomNumber} for Maintenance</DialogTitle>
+              <DialogDescription>
+                Specify the reason and duration for the maintenance.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...maintenanceForm}>
+              <form onSubmit={maintenanceForm.handleSubmit(onSubmitMaintenance)} className="space-y-4">
+                <FormField
+                  control={maintenanceForm.control}
+                  name="reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reason for Maintenance</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="e.g., Plumbing issue, deep cleaning, broken AC" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={maintenanceForm.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Start Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date < new Date() && date.toDateString() !== new Date().toDateString()
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={maintenanceForm.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>End Date (Optional)</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date < new Date() && date.toDateString() !== new Date().toDateString()
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsMaintenanceDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={createMaintenanceMutation.isPending}>
+                    {createMaintenanceMutation.isPending ? "Scheduling..." : "Schedule Maintenance"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 }

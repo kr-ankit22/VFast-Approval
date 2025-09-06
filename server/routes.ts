@@ -5,6 +5,8 @@ import {
   insertBookingSchema, 
   updateBookingStatusSchema, 
   roomAllocationSchema,
+  InsertGuest, GuestCheckInStatus, WorkflowStage,
+  InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
   BookingStatus
 } from "@shared/schema";
@@ -38,9 +40,12 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   app.get("/api/bookings", checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
     try {
       const status = req.query.status as BookingStatus | undefined;
+      const workflowStage = req.query.workflowStage as WorkflowStage | undefined;
       let bookings;
       
-      if (status) {
+      if (workflowStage) {
+        bookings = await storage.getBookingsByWorkflowStage(workflowStage);
+      } else if (status) {
         bookings = await storage.getBookingsByStatus(status);
       } else {
         bookings = await storage.getAllBookings();
@@ -276,6 +281,137 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  // Guest Management Endpoints
+
+  // Add a guest to a booking
+  app.post("/api/bookings/:bookingId/guests", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const { name, contact, kycDocumentUrl } = req.body;
+
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const guestData: InsertGuest = {
+        bookingId,
+        name,
+        contact,
+        kycDocumentUrl,
+      };
+
+      const guest = await storage.createGuest(guestData);
+      res.status(201).json(guest);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to add guest" });
+    }
+  });
+
+  // Get all guests for a booking
+  app.get("/api/bookings/:bookingId/guests", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const guests = await storage.getGuestsByBookingId(bookingId);
+      res.json(guests);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch guests" });
+    }
+  });
+
+  // Update guest details (including KYC verification and check-in/out)
+  app.patch("/api/guests/:guestId", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const updates = req.body;
+
+      const guest = await storage.updateGuest(guestId, updates);
+
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update guest" });
+    }
+  });
+
+  // Delete a guest
+  app.delete("/api/guests/:guestId", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      await storage.deleteGuest(guestId);
+      res.status(204).send(); // No content
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete guest" });
+    }
+  });
+
+  // Guest Notes Endpoints
+
+  // Add a note to a guest
+  app.post("/api/guests/:guestId/notes", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const { note, type } = req.body;
+
+      const guestNote: InsertGuestNote = {
+        guestId,
+        note,
+        type,
+      };
+
+      const newNote = await storage.createGuestNote(guestNote);
+      res.status(201).json(newNote);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add guest note" });
+    }
+  });
+
+  // Get all notes for a guest
+  app.get("/api/guests/:guestId/notes", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const notes = await storage.getGuestNotesByGuestId(guestId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch guest notes" });
+    }
+  });
+
+  // Booking Workflow Endpoints
+
+  // Update booking workflow stage
+  app.patch("/api/bookings/:id/workflow-stage", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const { stage, checkInStatus } = req.body;
+
+      if (!Object.values(WorkflowStage).includes(stage)) {
+        return res.status(400).json({ message: "Invalid workflow stage" });
+      }
+
+      if (checkInStatus && !Object.values(GuestCheckInStatus).includes(checkInStatus)) {
+        return res.status(400).json({ message: "Invalid check-in status" });
+      }
+
+      const booking = await storage.updateBookingWorkflowStage(bookingId, stage, checkInStatus);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update booking workflow stage" });
+    }
+  });
+
   // Allocate room to booking (VFast users)
   app.patch("/api/bookings/:id/allocate", checkRole([UserRole.VFAST]), async (req, res) => {
     try {
@@ -399,6 +535,66 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         return res.status(400).json({ message: validationError.message });
       }
       res.status(500).json({ message: "Failed to update room status" });
+    }
+  });
+
+  // Room Maintenance Endpoints
+
+  // Create a room maintenance entry
+  app.post("/api/rooms/:roomId/maintenance", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      const { reason, startDate, endDate, status } = req.body;
+
+      const room = await storage.getRoom(roomId);
+      if (!room) {
+        return res.status(404).json({ message: "Room not found" });
+      }
+
+      const maintenanceData: InsertRoomMaintenance = {
+        roomId,
+        reason,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : undefined,
+        status: status || RoomMaintenanceStatus.IN_PROGRESS,
+      };
+
+      const maintenance = await storage.createRoomMaintenance(maintenanceData);
+      res.status(201).json(maintenance);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create room maintenance entry" });
+    }
+  });
+
+  // Update room maintenance status
+  app.patch("/api/room-maintenance/:maintenanceId/status", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const maintenanceId = parseInt(req.params.maintenanceId);
+      const { status } = req.body;
+
+      if (!Object.values(RoomMaintenanceStatus).includes(status)) {
+        return res.status(400).json({ message: "Invalid maintenance status" });
+      }
+
+      const maintenance = await storage.updateRoomMaintenanceStatus(maintenanceId, status);
+
+      if (!maintenance) {
+        return res.status(404).json({ message: "Room maintenance entry not found" });
+      }
+
+      res.json(maintenance);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update room maintenance status" });
+    }
+  });
+
+  // Get all active room maintenance entries
+  app.get("/api/rooms/maintenance/active", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const activeMaintenance = await storage.getActiveRoomMaintenance();
+      res.json(activeMaintenance);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active room maintenance entries" });
     }
   });
 
