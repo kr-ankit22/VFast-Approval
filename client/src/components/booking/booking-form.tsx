@@ -91,11 +91,15 @@ export default function BookingForm() {
         throw err;
       }
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/my-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/department-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    onSuccess: async (data) => {
+      // Invalidate all relevant queries after a booking is created
+      await queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-reconsideration-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/department-approvals"] });
+      await queryClient.invalidateQueries({ queryKey: ["reconsideration-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+
       toast({
         title: "Booking submitted",
         description: "Your booking request has been successfully submitted.",

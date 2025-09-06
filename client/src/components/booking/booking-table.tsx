@@ -6,9 +6,10 @@ import { ReactNode } from "react";
 type BookingTableProps = {
   bookings: Booking[];
   renderActions?: (booking: Booking) => ReactNode;
+  showRequestType?: boolean;
 };
 
-export default function BookingTable({ bookings, renderActions }: BookingTableProps) {
+export default function BookingTable({ bookings, renderActions, showRequestType }: BookingTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -17,6 +18,7 @@ export default function BookingTable({ bookings, renderActions }: BookingTablePr
           <TableHead>Check-in</TableHead>
           <TableHead>Check-out</TableHead>
           <TableHead>Status</TableHead>
+          {showRequestType && <TableHead>Request Type</TableHead>}
           {renderActions && <TableHead>Actions</TableHead>}
         </TableRow>
       </TableHeader>
@@ -29,6 +31,13 @@ export default function BookingTable({ bookings, renderActions }: BookingTablePr
             <TableCell>
               <Badge>{booking.status}</Badge>
             </TableCell>
+            {showRequestType && (
+              <TableCell>
+                <Badge variant={booking.isReconsidered ? "secondary" : "default"}>
+                  {booking.isReconsidered ? "Reconsidered" : "New"}
+                </Badge>
+              </TableCell>
+            )}
             {renderActions && <TableCell>{renderActions(booking)}</TableCell>}
           </TableRow>
         ))}

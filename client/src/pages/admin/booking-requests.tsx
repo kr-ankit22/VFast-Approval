@@ -7,14 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,15 +18,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, X, Calendar, MapPin, Users, FileText } from "lucide-react";
-import { formatDate, getDaysBetweenDates } from "@/lib/utils";
-import BookingStatusBadge from "@/components/booking/booking-status-badge";
+import { Loader2, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { UserRole } from "@shared/schema";
+import BookingDetailsModal from "@/components/booking/booking-details-modal";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function BookingRequests() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("pending_admin_approval");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
@@ -55,10 +48,15 @@ export default function BookingRequests() {
       const res = await apiRequest("PATCH", data.url, { status: data.status, notes: data.notes });
       return await res.json();
     },
-    onSuccess: (updatedBooking) => {
-      // More aggressive cache invalidation to ensure UI updates
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      
+    onSuccess: async (updatedBooking) => {
+      // Invalidate all relevant queries
+      await queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["department-approvals"] });
+      await queryClient.invalidateQueries({ queryKey: ["reconsideration-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+
       toast({
         title: "Booking updated",
         description: "The booking status has been successfully updated.",
@@ -70,9 +68,6 @@ export default function BookingRequests() {
       setAdminNotes("");
       setIsApproveDialogOpen(false);
       setIsRejectDialogOpen(false);
-      
-      // Force a hard refresh of the page to ensure data is updated
-      window.location.reload();
     },
     onError: (error: Error) => {
       toast({
@@ -160,25 +155,17 @@ export default function BookingRequests() {
     
     updateBookingMutation.mutate({
       id: selectedBooking.id,
-      url: `/api/bookings/${selectedBooking.id}/soft-delete`,
+      url: `/api/bookings/${selectedBooking.id}/status`,
+      status: BookingStatus.REJECTED,
+      notes: adminNotes,
     });
-  };
-
-  // Get room type display name
-  const getRoomTypeDisplay = (type: string) => {
-    const types: Record<string, string> = {
-      "single": "Single Room",
-      "double": "Double Room",
-      "deluxe": "Deluxe Room",
-    };
-    return types[type] || type;
   };
 
   return (
     <DashboardLayout 
       title="Booking Requests"
       description="Review and manage all booking requests"
-      role={UserRole.ADMIN}
+      role={user?.role}
     >
       <Card>
         <CardHeader className="pb-3">
@@ -236,10 +223,11 @@ export default function BookingRequests() {
           ) : (
             <BookingTable 
               bookings={filteredBookings}
+              showRequestType={true}
               renderActions={(booking) => (
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
-                  {(booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.PENDING_RECONSIDERATION) && (
+                  {user?.role === UserRole.ADMIN && booking.status === BookingStatus.PENDING_ADMIN_APPROVAL && (
                     <>
                       <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>
                       <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking)}>Reject</Button>
@@ -259,129 +247,15 @@ export default function BookingRequests() {
         </CardContent>
       </Card>
 
-      {/* View Booking Details Dialog */}
       {selectedBooking && (
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Booking Request Details</DialogTitle>
-              <DialogDescription>
-                Request #{selectedBooking.id} submitted on {selectedBooking.createdAt ? formatDate(new Date(selectedBooking.createdAt)) : 'N/A'}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="py-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Status</h3>
-                <BookingStatusBadge status={selectedBooking.status} />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <Calendar className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Date Range</p>
-                    <p className="text-gray-600">
-                      {formatDate(new Date(selectedBooking.checkInDate))} - {formatDate(new Date(selectedBooking.checkOutDate))}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {getDaysBetweenDates(new Date(selectedBooking.checkInDate), new Date(selectedBooking.checkOutDate))} days
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Users className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Guest Information</p>
-                    <p className="text-gray-600">
-                      User ID: {selectedBooking.userId}
-                    </p>
-                    <p className="text-gray-600">
-                      Purpose: {selectedBooking.purpose}
-                    </p>
-                    <p className="text-gray-600">
-                      Number of Guests: {selectedBooking.guestCount}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <MapPin className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Referring Department</p>
-                    <p className="text-gray-600">
-                      {selectedBooking.departmentName}
-                    </p>
-                    {selectedBooking.roomNumber && (
-                      <p className="text-gray-600">
-                        Assigned Room: <span className="font-medium">{selectedBooking.roomNumber}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {selectedBooking.specialRequests && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Special Requests</p>
-                      <p className="text-gray-600">{selectedBooking.specialRequests}</p>
-                    </div>
-                  </div>
-                )}
-
-                {(selectedBooking.adminNotes || selectedBooking.vfastNotes) && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Notes</p>
-                      {selectedBooking.adminNotes && (
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500">Admin Note:</p>
-                          <p className="text-gray-600">{selectedBooking.adminNotes}</p>
-                        </div>
-                      )}
-                      {selectedBooking.vfastNotes && (
-                        <div>
-                          <p className="text-xs text-gray-500">VFast Note:</p>
-                          <p className="text-gray-600">{selectedBooking.vfastNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              {(selectedBooking.status === BookingStatus.PENDING_ADMIN_APPROVAL || selectedBooking.status === BookingStatus.PENDING_RECONSIDERATION) && (
-                <>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => {
-                      setIsViewDialogOpen(false);
-                      setIsRejectDialogOpen(true);
-                    }}
-                  >
-                    Reject
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      setIsViewDialogOpen(false);
-                      setIsApproveDialogOpen(true);
-                    }}
-                  >
-                    Approve
-                  </Button>
-                </>
-              )}
-              {selectedBooking.status !== BookingStatus.PENDING_ADMIN_APPROVAL && selectedBooking.status !== BookingStatus.PENDING_RECONSIDERATION && (
-                <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <BookingDetailsModal
+          booking={selectedBooking}
+          isOpen={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          userRole={UserRole.ADMIN}
+          onApprove={handleApproveBooking}
+          onReject={handleRejectBooking}
+        />
       )}
 
       {/* Approve Booking Dialog */}

@@ -28,6 +28,14 @@ import RoomManagement from "@/pages/admin/room-management";
 import VFastDashboard from "@/pages/vfast/dashboard";
 import RoomAllocationPage from "@/pages/vfast/room-allocation";
 import Reconsideration from "@/pages/vfast/reconsideration";
+import VFastAllBookingRequests from "@/pages/vfast/all-booking-requests";
+import VFastRoomInventory from "@/pages/vfast/room-inventory";
+import RoomAvailabilityPage from "@/pages/vfast/room-availability";
+import AllocateRoomPage from "@/pages/vfast/allocate-room-page";
+
+import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
+
+import ReconsiderWorklist from "@/pages/booking-user/reconsider-worklist";
 
 function Router() {
   return (
@@ -41,6 +49,8 @@ function Router() {
       <ProtectedRoute path="/booking/create" component={CreateBooking} role={UserRole.BOOKING} />
       <ProtectedRoute path="/booking/history" component={BookingHistory} role={UserRole.BOOKING} />
       <ProtectedRoute path="/booking/:id" component={BookingDetailsPage} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/booking/reconsider/:id" component={ReconsiderBookingPage} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/booking/reconsider" component={ReconsiderWorklist} role={UserRole.BOOKING} />
       
       {/* Department Approver Routes */}
       <ProtectedRoute path="/department" component={DepartmentApproverDashboard} role={UserRole.DEPARTMENT_APPROVER} />
@@ -54,7 +64,13 @@ function Router() {
       {/* VFast Routes */}
       <ProtectedRoute path="/vfast" component={VFastDashboard} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/allocation" component={RoomAllocationPage} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/allocation/:id" component={RoomAllocationPage} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/reconsideration" component={Reconsideration} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/all-booking-requests" component={VFastAllBookingRequests} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/all-booking-requests/:id" component={VFastAllBookingRequests} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/room-inventory" component={VFastRoomInventory} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/room-availability" component={RoomAvailabilityPage} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/allocate/:id" component={AllocateRoomPage} role={UserRole.VFAST} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

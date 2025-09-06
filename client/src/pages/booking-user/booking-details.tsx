@@ -11,6 +11,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
+import BookingJourney from "@/components/booking/booking-journey";
+
 import ReconsiderationButton from "@/components/booking/reconsideration-button";
 import { BookingStatus } from "@shared/schema";
 
@@ -207,6 +209,15 @@ export default function BookingDetailsPage() {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Booking Journey</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BookingJourney bookingId={booking.id} />
         </CardContent>
       </Card>
     </DashboardLayout>

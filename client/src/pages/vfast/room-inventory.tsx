@@ -15,22 +15,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Loader2, 
-  Search, 
-  X, 
-  Filter, 
-  Plus, 
-  Wifi, 
-  Tv, 
-  Wind, 
-  RefrigeratorIcon 
+import {
+  Loader2,
+  Search,
+  X,
+  Filter,
+  Wifi,
+  Tv,
+  Wind,
+  RefrigeratorIcon
 } from "lucide-react";
 import { UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
-export default function RoomManagement() {
+export default function VFastRoomInventory() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -119,9 +119,9 @@ export default function RoomManagement() {
 
   return (
     <DashboardLayout
-      title="Room Management"
-      description="View and manage all rooms in the VFast hostel"
-      role={user?.role}
+      title="Room Inventory"
+      description="View all rooms in the VFast hostel"
+      role={UserRole.VFAST}
     >
       <Card>
         <CardHeader className="pb-3">
@@ -140,11 +140,6 @@ export default function RoomManagement() {
               <Button variant="outline" size="icon">
                 <Filter size={18} />
               </Button>
-              {user?.role === UserRole.ADMIN && (
-                <Button>
-                  <Plus size={16} className="mr-2" /> Add Room
-                </Button>
-              )}
             </div>
           </div>
         </CardHeader>
@@ -220,21 +215,16 @@ export default function RoomManagement() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {user?.role === UserRole.ADMIN && (
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm">
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleMarkAsReserved(room)}
-                              disabled={room.status === RoomStatus.RESERVED}
-                            >
-                              Mark as Reserved
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleMarkAsReserved(room)}
+                            disabled={room.status === RoomStatus.RESERVED}
+                          >
+                            Mark as Reserved
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

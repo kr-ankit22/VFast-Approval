@@ -9,7 +9,7 @@ import {
   departments,
   rooms
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, lt, gt, lte, gte } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
@@ -25,13 +25,15 @@ export interface IStorage {
   // Booking operations
   getBooking(id: number): Promise<Booking | undefined>;
   getBookingsByUserId(userId: number): Promise<Booking[]>;
+  getBookingsByUserIdAndStatus(userId: number, status: BookingStatus): Promise<Booking[]>;
   getAllBookings(): Promise<any[]>;
   getBookingsByStatus(status: BookingStatus): Promise<Booking[]>;
   getBookingsByDepartment(departmentId: number): Promise<Booking[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(params: UpdateBookingStatus): Promise<Booking | undefined>;
   reconsiderBooking(bookingId: number, bookingData: InsertBooking): Promise<Booking | undefined>;
-  softDeleteBooking(id: number): Promise<Booking | undefined>;
+  getBookingJourney(bookingId: number): Promise<any>;
+  
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
   
   // Room operations
@@ -132,6 +134,20 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getBookingsByUserIdAndStatus(userId: number, status: BookingStatus): Promise<any[]> {
+    try {
+      const result = await this.dbClient.select({
+        ...bookings,
+        departmentName: departments.name
+      }).from(bookings).where(and(eq(bookings.userId, userId), eq(bookings.status, status))).leftJoin(departments, eq(bookings.department_id, departments.id));
+      console.log('getBookingsByUserIdAndStatus result:', result);
+      return result;
+    } catch (error) {
+      // console.error(`Error in getBookingsByUserIdAndStatus for user ID ${userId} and status ${status}:`, error);
+      throw new Error("Failed to retrieve user bookings by status.");
+    }
+  }
+
   async getAllBookings(): Promise<any[]> {
     try {
       return await this.dbClient.select({
@@ -146,12 +162,12 @@ export class DatabaseStorage implements IStorage {
 
   async getBookingsByStatus(status: BookingStatus): Promise<Booking[]> {
     try {
-      // console.log(`Executing query for status: ${status}`);
+      console.log(`Executing query for status: ${status}`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.status, status));
-      // console.log('getBookingsByStatus result:', result);
+      console.log('getBookingsByStatus result:', result);
       return result;
     } catch (error) {
-      // console.error(`Error in getBookingsByStatus for status ${status}:`, error);
+      console.error(`Error in getBookingsByStatus for status ${status}:`, error);
       throw new Error("Failed to retrieve bookings by status.");
     }
   }
@@ -219,6 +235,8 @@ export class DatabaseStorage implements IStorage {
             updateSet.adminNotes = notes;
           } else if (approver.role === 'vfast') {
             updateSet.vfastNotes = notes;
+          } else if (approver.role === 'department_approver') {
+            // Department approver notes should be stored in a separate field if needed
           }
         }
       }
@@ -230,7 +248,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error) {
-      // console.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
+      console.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
       throw new Error("Failed to update booking status.");
     }
   }
@@ -249,7 +267,6 @@ export class DatabaseStorage implements IStorage {
           status: BookingStatus.PENDING_DEPARTMENT_APPROVAL,
           isReconsidered: true,
           reconsiderationCount: (originalBooking.reconsiderationCount || 0) + 1,
-          reconsideredFromId: bookingId,
         })
         .where(eq(bookings.id, bookingId))
         .returning();
@@ -261,31 +278,123 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async softDeleteBooking(id: number): Promise<Booking | undefined> {
+  async getBookingJourney(bookingId: number): Promise<any> {
     try {
-      const [booking] = await this.dbClient
-        .update(bookings)
-        .set({ isDeleted: true })
-        .where(eq(bookings.id, id))
-        .returning();
-      return booking;
+      const booking = await this.getBooking(bookingId);
+      if (!booking) {
+        return null;
+      }
+
+      const journey: any[] = [];
+
+      // Booking Creation
+      const creator = await this.getUser(booking.userId);
+      journey.push({
+        stage: "Booking Creation",
+        status: "Submitted",
+        actor: creator ? { id: creator.id, name: creator.name } : null,
+        timestamp: booking.createdAt,
+        notes: null,
+      });
+
+      // Department Approval
+      if (booking.departmentApproverId) {
+        const approver = await this.getUser(booking.departmentApproverId);
+        journey.push({
+          stage: "Department Approval",
+          status: booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
+          actor: approver ? { id: approver.id, name: approver.name } : null,
+          timestamp: booking.departmentApprovalAt,
+          notes: null, // Add notes if available
+        });
+      }
+
+      // Admin Approval
+      if (booking.adminApproverId) {
+        const approver = await this.getUser(booking.adminApproverId);
+        journey.push({
+          stage: "Admin Approval",
+          status: booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
+          actor: approver ? { id: approver.id, name: approver.name } : null,
+          timestamp: booking.adminApprovalAt,
+          notes: booking.adminNotes,
+        });
+      }
+
+      // Rejection History
+      if (booking.rejectionHistory) {
+        for (const rejection of booking.rejectionHistory) {
+          const rejecter = await this.getUser(rejection.rejectedBy);
+          journey.push({
+            stage: "Rejection",
+            status: "Rejected",
+            actor: rejecter ? { id: rejecter.id, name: rejecter.name } : null,
+            timestamp: rejection.rejectedAt,
+            notes: rejection.reason,
+          });
+        }
+      }
+      
+      // Room Allocation
+      if (booking.status === BookingStatus.ALLOCATED) {
+        journey.push({
+          stage: "Room Allocation",
+          status: "Allocated",
+          actor: null, // VFAST user details can be added here if needed
+          timestamp: booking.updatedAt, // Assuming updatedAt is the allocation time
+          notes: booking.vfastNotes,
+        });
+      }
+
+      // Sort journey by timestamp
+      journey.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      return journey;
     } catch (error) {
-      // console.error(`Error in softDeleteBooking for ID ${id}:`, error);
-      throw new Error("Failed to soft delete booking.");
+      console.error(`Error in getBookingJourney for booking ID ${bookingId}:`, error);
+      throw new Error("Failed to retrieve booking journey.");
     }
   }
+
+  
 
 
 
   async allocateRoom(params: RoomAllocation): Promise<Booking | undefined> {
     try {
       const { bookingId, roomNumber, notes } = params;
-      // console.log("--- Allocating Room --- C: \Users\indan\Downloads\VFastBooker\VFastBooker\server\storage.ts");
-      // console.log("Params:", params);
-      
+
+      const bookingToAllocate = await this.getBooking(bookingId);
+      if (!bookingToAllocate) {
+        throw new Error("Booking not found");
+      }
+
+      const overlappingBookings = await this.dbClient.select().from(bookings).where(
+        and(
+          eq(bookings.roomNumber, roomNumber),
+          or(
+            and(
+              lte(bookings.checkInDate, bookingToAllocate.checkInDate),
+              gte(bookings.checkOutDate, bookingToAllocate.checkInDate)
+            ),
+            and(
+              lte(bookings.checkInDate, bookingToAllocate.checkOutDate),
+              gte(bookings.checkOutDate, bookingToAllocate.checkOutDate)
+            ),
+            and(
+              gte(bookings.checkInDate, bookingToAllocate.checkInDate),
+              lte(bookings.checkOutDate, bookingToAllocate.checkOutDate)
+            )
+          )
+        )
+      );
+
+      if (overlappingBookings.length > 0) {
+        throw new Error("Room is already booked for the selected dates.");
+      }
+
       // Verify room exists and is available
       const room = await this.getRoomByNumber(roomNumber);
-      // console.log("Room before allocation:", room);
       if (!room || room.status !== RoomStatus.AVAILABLE) {
         throw new Error("Room not available");
       }
@@ -297,7 +406,6 @@ export class DatabaseStorage implements IStorage {
         
         // Update room availability
         const roomUpdateSet = { status: RoomStatus.OCCUPIED };
-        // console.log("Updating room status to OCCUPIED");
         await this.dbClient
           .update(rooms)
           .set(roomUpdateSet)
@@ -305,7 +413,6 @@ export class DatabaseStorage implements IStorage {
           .execute();
 
         const updatedRoom = await this.getRoomByNumber(roomNumber);
-        // console.log("Room after allocation:", updatedRoom);
         
         // Update booking with allocated room and status
         const bookingUpdateSet = { 
@@ -313,7 +420,6 @@ export class DatabaseStorage implements IStorage {
             status: BookingStatus.ALLOCATED,
             vfastNotes: notes
           };
-        // console.log("Updating booking status to ALLOCATED");
         const [updatedBooking] = await this.dbClient
           .update(bookings)
           .set(bookingUpdateSet)
@@ -321,17 +427,14 @@ export class DatabaseStorage implements IStorage {
           .returning();
         
         await client.query('COMMIT');
-        // console.log("--- Allocation Complete ---");
         return updatedBooking;
       } catch (error) {
         await client.query('ROLLBACK');
-        // console.error("--- Allocation Failed: Transaction Rolled Back ---");
         throw error;
       } finally {
         client.release();
       }
     } catch (error) {
-      // console.error(`Error in allocateRoom for booking ID ${params.bookingId}:`, error);
       throw new Error("Failed to allocate room.");
     }
   }

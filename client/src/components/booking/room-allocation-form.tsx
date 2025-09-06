@@ -31,7 +31,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar, User, FileText } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import BookingJourney from "@/components/booking/booking-journey";
 
 interface RoomAllocationFormProps {
   booking: Booking;
@@ -44,18 +46,8 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
   const { toast } = useToast();
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
-  // Fetch all available rooms - we no longer filter by room preference
-  const {
-    data: availableRooms,
-    isLoading: isLoadingRooms,
-    isError: isRoomsError,
-  } = useQuery<Room[]>({
-    queryKey: ['/api/rooms'],
-    queryFn: async ({ queryKey }) => {
-      const res = await fetch(queryKey[0] as string);
-      if (!res.ok) throw new Error("Failed to fetch available rooms");
-      return res.json();
-    },
+  const { data: availableRooms, isLoading: isLoadingRooms, isError: isRoomsError } = useQuery<Room[]>({
+    queryKey: ['/api/rooms/available'],
   });
 
   const form = useForm<FormSchema>({
@@ -76,19 +68,12 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
       );
       return await res.json();
     },
-    onSuccess: () => {
-      // Aggressively invalidate all booking and room queries
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings/approved'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms/available'] });
-      
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
         title: "Room Allocated",
-        description: `Room ${form.getValues().roomNumber} has been successfully allocated to booking #${booking.id}.`,
-        variant: "default",
+        description: `Room ${form.getValues().roomNumber} has been successfully allocated.`,
       });
-      
       if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
@@ -100,10 +85,9 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     },
   });
 
-  // Handle room selection
   const handleRoomSelection = (roomNumber: string) => {
-    const selectedRoom = availableRooms?.find(room => room.roomNumber === roomNumber) || null;
-    setSelectedRoom(selectedRoom);
+    const room = availableRooms?.find(r => r.roomNumber === roomNumber) || null;
+    setSelectedRoom(room);
     form.setValue("roomNumber", roomNumber);
   };
 
@@ -111,133 +95,53 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     allocateRoomMutation.mutate(data);
   }
 
-  // Get room type display name
-  const getRoomTypeDisplay = (type: string) => {
-    const types: Record<string, string> = {
-      [RoomType.STANDARD]: "Standard Room",
-    };
-    return types[type] || type;
-  };
-
-  // Get floor display
-  const getFloorDisplay = (floor: number) => {
-    if (floor === 1) return "Ground Floor";
-    if (floor === 2) return "First Floor";
-    if (floor === 3) return "Second Floor";
-    return `Floor ${floor}`;
-  };
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            control={form.control}
-            name="bookingId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Booking ID</FormLabel>
+        <FormField
+          control={form.control}
+          name="roomNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Available Rooms</FormLabel>
+              <Select onValueChange={handleRoomSelection} value={field.value}>
                 <FormControl>
-                  <div className="h-10 px-3 py-2 rounded-md border border-gray-300 bg-gray-100 flex items-center">
-                    {booking.id}
-                  </div>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a room" />
+                  </SelectTrigger>
                 </FormControl>
-                <FormDescription>
-                  Cannot be changed
-                </FormDescription>
-              </FormItem>
-            )}
-          />
-          
-          <div>
-            <FormLabel>Referring Department</FormLabel>
-            <div className="h-10 px-3 py-2 rounded-md border border-gray-300 bg-gray-100 flex items-center">
-              {booking.departmentName}
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Department that made this request
-            </p>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="roomNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Room Number</FormLabel>
-                <Select
-                  onValueChange={(value) => {
-                    field.onChange(value);
-                    handleRoomSelection(value);
-                  }}
-                  value={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a room" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoadingRooms ? (
-                      <div className="flex items-center justify-center p-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      </div>
-                    ) : isRoomsError ? (
-                      <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
-                    ) : availableRooms && availableRooms.length > 0 ? (
-                      availableRooms.map((room) => (
-                        <SelectItem key={room.roomNumber} value={room.roomNumber} disabled={room.status !== RoomStatus.AVAILABLE}>
-                          {room.roomNumber} ({getRoomTypeDisplay(room.type)}) - {room.status === RoomStatus.AVAILABLE ? 'Available' : (room.status === RoomStatus.RESERVED ? 'Reserved by Admin' : 'Occupied')}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-gray-500 text-sm">No available rooms</div>
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+                <SelectContent>
+                  {isLoadingRooms ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  ) : isRoomsError ? (
+                    <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
+                  ) : availableRooms && availableRooms.length > 0 ? (
+                    availableRooms.map((room) => (
+                      <SelectItem key={room.roomNumber} value={room.roomNumber}>
+                        {room.roomNumber} ({room.type}) - {room.status}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-gray-500 text-sm">No available rooms</div>
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {selectedRoom && (
-          <Card className="border-dashed border-primary border-2">
+          <Card className="border-dashed">
             <CardHeader className="pb-2">
-              <CardTitle>Room Details</CardTitle>
-              <CardDescription>
-                Information about the selected room
-              </CardDescription>
+              <CardTitle>Selected Room Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Room Number</p>
-                  <p className="text-lg">{selectedRoom.roomNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Type</p>
-                  <p className="text-lg">{getRoomTypeDisplay(selectedRoom.type)}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Floor</p>
-                  <p className="text-lg">{getFloorDisplay(selectedRoom.floor)}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Features</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {selectedRoom.features && Array.isArray(selectedRoom.features) ? (
-                      selectedRoom.features.map((feature, index) => (
-                        <span key={index} className="text-xs bg-primary bg-opacity-10 text-primary px-2 py-1 rounded-full">
-                          {feature}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-500 text-sm">No features listed</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <p><strong>Type:</strong> {selectedRoom.type}</p>
+              <p><strong>Floor:</strong> {selectedRoom.floor}</p>
+              <p><strong>Features:</strong> {selectedRoom.features?.join(", ")}</p>
             </CardContent>
           </Card>
         )}
@@ -250,32 +154,19 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
               <FormLabel>Allocation Notes</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Add any relevant notes about this room allocation..."
-                  className="resize-none"
+                  placeholder="Add any relevant notes..."
                   rows={3}
                   {...field}
                 />
               </FormControl>
-              <FormDescription>
-                Optional notes about special arrangements or instructions
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
 
         <div className="flex justify-end space-x-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onSuccess}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={allocateRoomMutation.isPending || !form.getValues().roomNumber}
-          >
+          <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
+          <Button type="submit" disabled={allocateRoomMutation.isPending || !form.getValues().roomNumber}>
             {allocateRoomMutation.isPending ? "Allocating..." : "Assign Room"}
           </Button>
         </div>

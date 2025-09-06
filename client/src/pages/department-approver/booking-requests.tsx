@@ -6,14 +6,6 @@ import BookingTable from "@/components/booking/booking-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,12 +17,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, X, Calendar, MapPin, Users, FileText } from "lucide-react";
-import { formatDate, getDaysBetweenDates } from "@/lib/utils";
-import BookingStatusBadge from "@/components/booking/booking-status-badge";
+import { Loader2, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@shared/schema";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BookingDetailsModal from "@/components/booking/booking-details-modal";
 
 export default function DepartmentBookingRequests() {
   const { toast } = useToast();
@@ -180,10 +171,11 @@ export default function DepartmentBookingRequests() {
           ) : (
             <BookingTable 
               bookings={filteredBookings}
+              showRequestType={true}
               renderActions={(booking) => (
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
-                  {(booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL || booking.status === BookingStatus.PENDING_RECONSIDERATION) && (
+                  {booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL && (
                     <>
                       <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>
                       <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking)}>Reject</Button>
@@ -197,99 +189,14 @@ export default function DepartmentBookingRequests() {
       </Card>
 
       {selectedBooking && (
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Booking Request Details</DialogTitle>
-              <DialogDescription>
-                Request #{selectedBooking.id} submitted on {selectedBooking.createdAt ? formatDate(new Date(selectedBooking.createdAt)) : 'N/A'}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="py-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Status</h3>
-                <BookingStatusBadge status={selectedBooking.status} />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <Calendar className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Date Range</p>
-                    <p className="text-gray-600">
-                      {formatDate(new Date(selectedBooking.checkInDate))} - {formatDate(new Date(selectedBooking.checkOutDate))}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {getDaysBetweenDates(new Date(selectedBooking.checkInDate), new Date(selectedBooking.checkOutDate))} days
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Users className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Guest Information</p>
-                    <p className="text-gray-600">
-                      User ID: {selectedBooking.userId}
-                    </p>
-                    <p className="text-gray-600">
-                      Purpose: {selectedBooking.purpose}
-                    </p>
-                    <p className="text-gray-600">
-                      Number of Guests: {selectedBooking.guestCount}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <MapPin className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium">Referring Department</p>
-                    <p className="text-gray-600">
-                      {selectedBooking.referringDepartment}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedBooking.specialRequests && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Special Requests</p>
-                      <p className="text-gray-600">{selectedBooking.specialRequests}</p>
-                    </div>
-                  </div>
-                )}
-
-                {(selectedBooking.adminNotes || selectedBooking.vfastNotes) && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium">Notes</p>
-                      {selectedBooking.adminNotes && (
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500">Admin Note:</p>
-                          <p className="text-gray-600">{selectedBooking.adminNotes}</p>
-                        </div>
-                      )}
-                      {selectedBooking.vfastNotes && (
-                        <div>
-                          <p className="text-xs text-gray-500">VFast Note:</p>
-                          <p className="text-gray-600">{selectedBooking.vfastNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <BookingDetailsModal
+          booking={selectedBooking}
+          isOpen={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          userRole={UserRole.DEPARTMENT_APPROVER}
+          onApprove={handleApproveBooking}
+          onReject={handleRejectBooking}
+        />
       )}
 
       {selectedBooking && (

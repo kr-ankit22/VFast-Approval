@@ -71,11 +71,14 @@ export const useUpdateBookingStatus = () => {
   const queryClient = useQueryClient();
   return useMutation<Booking, Error, UpdateBookingStatus>({
     mutationFn: updateBookingStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/department-approvals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["department-approvals"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/department-approvals"] });
+      await queryClient.invalidateQueries({ queryKey: ["reconsideration-bookings"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
     },
   });
 };
@@ -159,5 +162,35 @@ export const useResubmitBooking = () => {
       queryClient.invalidateQueries({ queryKey: ["my-bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
     },
+  });
+};
+
+const fetchMyReconsiderationBookings = async (): Promise<Booking[]> => {
+  const response = await fetch("/api/my-bookings/reconsider");
+  if (!response.ok) {
+    throw new Error("Failed to fetch my reconsideration bookings");
+  }
+  return response.json();
+};
+
+export const useGetMyReconsiderationBookings = () => {
+  return useQuery<Booking[], Error>({
+    queryKey: ["my-reconsideration-bookings"],
+    queryFn: fetchMyReconsiderationBookings,
+  });
+};
+
+const fetchRooms = async (): Promise<Room[]> => {
+  const response = await fetch("/api/rooms");
+  if (!response.ok) {
+    throw new Error("Failed to fetch rooms");
+  }
+  return response.json();
+};
+
+export const useGetRooms = () => {
+  return useQuery<Room[], Error>({
+    queryKey: ["rooms"],
+    queryFn: fetchRooms,
   });
 };

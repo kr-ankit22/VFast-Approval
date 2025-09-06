@@ -44,6 +44,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/booking", icon: <Home size={18} />, label: "Dashboard" },
           { href: "/booking/create", icon: <PlusCircle size={18} />, label: "New Booking" },
           { href: "/booking/history", icon: <History size={18} />, label: "Booking History" },
+          { href: "/booking/reconsider", icon: <RefreshCw size={18} />, label: "Reconsideration" },
           { href: "/profile", icon: <UserCog size={18} />, label: "Profile Settings" }
         ];
       case UserRole.ADMIN:
@@ -65,6 +66,8 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/vfast", icon: <Home size={18} />, label: "Dashboard" },
           { href: "/vfast/allocation", icon: <DoorOpen size={18} />, label: "Room Allocation" },
           { href: "/vfast/reconsideration", icon: <RefreshCw size={18} />, label: "Reconsideration Requests" },
+          { href: "/vfast/all-booking-requests", icon: <ClipboardList size={18} />, label: "All Booking Requests" },
+          { href: "/vfast/room-inventory", icon: <Hotel size={18} />, label: "Room Inventory" },
           { href: "/vfast/settings", icon: <Settings size={18} />, label: "Settings" }
         ];
       default:

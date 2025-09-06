@@ -59,10 +59,33 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const bookings = await storage.getBookingsByUserId(req.user.id);
+      const status = req.query.status as BookingStatus | undefined;
+      let bookings;
+
+      if (status) {
+        bookings = await storage.getBookingsByUserIdAndStatus(req.user.id, status);
+      } else {
+        bookings = await storage.getBookingsByUserId(req.user.id);
+      }
+
       res.json(bookings);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Get user's bookings for reconsideration (Booking users)
+  app.get("/api/my-bookings/reconsider", checkRole([UserRole.BOOKING]), async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const bookings = await storage.getBookingsByUserIdAndStatus(req.user.id, BookingStatus.PENDING_RECONSIDERATION);
+
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch bookings for reconsideration" });
     }
   });
 
@@ -85,6 +108,22 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.json(booking);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking" });
+    }
+  });
+
+  // Get booking journey
+  app.get("/api/bookings/:id/journey", async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const journey = await storage.getBookingJourney(bookingId);
+      
+      if (!journey) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      res.json(journey);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch booking journey" });
     }
   });
 
@@ -184,6 +223,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       
       res.json(booking);
     } catch (error) {
+      console.error("Error updating booking status:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -202,13 +242,23 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       }
 
       const bookingId = parseInt(req.params.id);
-      const bookingData = {
+      const originalBooking = await storage.getBooking(bookingId);
+
+      if (!originalBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (originalBooking.status !== BookingStatus.PENDING_RECONSIDERATION) {
+        return res.status(400).json({ message: "Booking is not pending reconsideration" });
+      }
+
+      const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
         status: BookingStatus.PENDING_DEPARTMENT_APPROVAL, // Explicitly set status
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
-      };
+      });
 
       const booking = await storage.reconsiderBooking(bookingId, bookingData);
 
@@ -365,6 +415,22 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     } catch (error) {
       // console.error("Failed to write log file:", error);
       res.status(500).json({ message: "Failed to write log file" });
+    }
+  });
+
+  // Get user details
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 }

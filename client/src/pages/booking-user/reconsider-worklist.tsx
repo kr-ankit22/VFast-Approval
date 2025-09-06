@@ -1,0 +1,176 @@
+import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Booking, BookingStatus, UserRole } from "@shared/schema";
+import { Link } from "wouter";
+import { formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Calendar, 
+  FileSearch, 
+  Loader2, 
+  Search,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import DashboardLayout from "@/components/layout/dashboard-layout";
+import ReconsiderationButton from "@/components/booking/reconsideration-button";
+
+export default function ReconsiderWorklist() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Fetch user's bookings with status PENDING_RECONSIDERATION
+  const { data: bookings = [], isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/my-bookings", { status: BookingStatus.PENDING_RECONSIDERATION }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/my-bookings?status=${BookingStatus.PENDING_RECONSIDERATION}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch bookings for reconsideration");
+      }
+      return res.json();
+    },
+  });
+  
+  // Show error toast if there's an error
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load bookings",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+  
+  // Function to render the status badge with appropriate color
+  const renderStatusBadge = (status: BookingStatus) => {
+    return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Pending Reconsideration</Badge>;
+  };
+
+  // Filter and search bookings
+  const filteredBookings = bookings.filter((booking) => {
+    // Search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        booking.purpose.toLowerCase().includes(searchLower) ||
+        (booking.departmentName && booking.departmentName.toLowerCase().includes(searchLower)) ||
+        (booking.roomNumber && booking.roomNumber.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    return true;
+  });
+  
+  return (
+    <DashboardLayout 
+      title="Reconsideration Worklist" 
+      description="View and manage your rejected booking requests that can be reconsidered."
+      role={UserRole.BOOKING}
+    >
+      <div className="bg-white p-6 rounded-lg shadow mb-8">
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <Input
+              type="search"
+              placeholder="Search by purpose, department or room"
+              className="ps-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center p-8 bg-white rounded-lg shadow">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+            <p className="text-muted-foreground">Loading your bookings for reconsideration...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="bg-destructive/10 text-destructive p-6 rounded-lg shadow">
+          <h3 className="font-semibold mb-2">Error Loading Bookings</h3>
+          <p>We encountered a problem loading your bookings. Please try again.</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : filteredBookings.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Guests</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredBookings.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 text-sm text-gray-900">{booking.purpose}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {formatDate(new Date(booking.checkInDate))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {formatDate(new Date(booking.checkOutDate))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-900">{booking.guestCount}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900">{booking.departmentName}</td>
+                    <td className="px-4 py-4 text-sm">{renderStatusBadge(booking.status as BookingStatus)}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900">
+                      {booking.roomNumber || 
+                        <span className="text-gray-400 italic">Not assigned</span>
+                      }
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-900">
+                      <ReconsiderationButton booking={booking} />
+                      <Link href={`/booking/${booking.id}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <FileSearch className="h-4 w-4" />
+                          <span className="sr-only">View Details</span>
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-8 text-center rounded-lg shadow">
+          <div className="flex flex-col items-center max-w-sm mx-auto">
+            <FileSearch className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No bookings for reconsideration</h3>
+            <p className="text-gray-500 mb-6">
+              You have no booking requests that are pending reconsideration.
+            </p>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}
