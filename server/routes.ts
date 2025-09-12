@@ -5,7 +5,7 @@ import {
   insertBookingSchema, 
   updateBookingStatusSchema, 
   roomAllocationSchema,
-  InsertGuest, GuestCheckInStatus, WorkflowStage,
+  InsertGuest, GuestCheckInStatus, WorkflowStage, WorkflowStage,
   InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
   BookingStatus
@@ -160,7 +160,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
 
-      if (status !== BookingStatus.PENDING_ADMIN_APPROVAL && status !== BookingStatus.REJECTED) {
+      if (status !== BookingStatus.APPROVED && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
       }
 
@@ -183,12 +183,12 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Create a new booking (Booking users)
   app.post("/api/bookings", checkRole([UserRole.BOOKING]), async (req, res) => {
-    debugger;
+    
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+      console.log(req.body);
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
@@ -220,7 +220,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         approverId: req.user.id
       });
       
-      const booking = await storage.updateBookingStatus(statusData);
+      let updatedBookingData = { ...statusData };
+      if (statusData.status === BookingStatus.APPROVED) {
+        updatedBookingData = { ...updatedBookingData, currentWorkflowStage: WorkflowStage.ALLOCATION_PENDING };
+      }
+      const booking = await storage.updateBookingStatus(updatedBookingData);
       
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
@@ -415,6 +419,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Allocate room to booking (VFast users)
   app.patch("/api/bookings/:id/allocate", checkRole([UserRole.VFAST]), async (req, res) => {
     try {
+      console.log(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
       const bookingId = parseInt(req.params.id);
       const allocationData = roomAllocationSchema.parse({
         bookingId: bookingId,
@@ -516,13 +521,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-  // Update room status (Admin users)
-  app.patch("/api/rooms/:id/status", checkRole([UserRole.ADMIN]), async (req, res) => {
+  // Update room status (Admin and VFast users)
+  app.patch("/api/rooms/:id/status", checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
     try {
       const roomId = parseInt(req.params.id);
-      const { status } = req.body;
+      const { status, notes } = req.body;
 
-      const room = await storage.updateRoomStatus(roomId, status);
+      const room = await storage.updateRoomStatus(roomId, status, notes, req.user.id);
 
       if (!room) {
         return res.status(404).json({ message: "Room not found" });
@@ -534,7 +539,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      res.status(500).json({ message: "Failed to update room status" });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 

@@ -15,6 +15,23 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Loader2,
   Search,
@@ -32,7 +49,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -56,6 +72,9 @@ export default function VFastRoomInventory() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isMaintenanceDialogOpen, setIsMaintenanceDialogOpen] = useState(false);
   const [selectedRoomForMaintenance, setSelectedRoomForMaintenance] = useState<Room | null>(null);
+  const [isReserveDialogOpen, setIsReserveDialogOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [reservationNotes, setReservationNotes] = useState("");
 
   const { data: rooms, isLoading, isError, error } = useGetRooms();
 
@@ -65,8 +84,8 @@ export default function VFastRoomInventory() {
   });
 
   const updateRoomStatusMutation = useMutation({
-    mutationFn: async (data: { id: number; status: RoomStatus }) => {
-      const res = await apiRequest("PATCH", `/api/rooms/${data.id}/status`, { status: data.status });
+    mutationFn: async (data: { id: number; status: RoomStatus; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/rooms/${data.id}/status`, { status: data.status, notes: data.notes });
       return await res.json();
     },
     onSuccess: () => {
@@ -141,7 +160,17 @@ export default function VFastRoomInventory() {
   });
 
   const handleMarkAsReserved = (room: Room) => {
-    updateRoomStatusMutation.mutate({ id: room.id, status: RoomStatus.RESERVED });
+    setSelectedRoom(room);
+    setIsReserveDialogOpen(true);
+  };
+
+  const handleConfirmReserve = () => {
+    if (selectedRoom) {
+      updateRoomStatusMutation.mutate({ id: selectedRoom.id, status: RoomStatus.RESERVED, notes: reservationNotes });
+      setIsReserveDialogOpen(false);
+      setReservationNotes("");
+      setSelectedRoom(null);
+    }
   };
 
   const handleMarkForMaintenance = (room: Room) => {
@@ -227,6 +256,7 @@ export default function VFastRoomInventory() {
   };
 
   return (
+    <TooltipProvider>
     <DashboardLayout
       title="Room Inventory"
       description="View all rooms in the VFast hostel"
@@ -322,7 +352,16 @@ export default function VFastRoomInventory() {
                         ) : room.status === RoomStatus.OCCUPIED ? (
                           <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Occupied</Badge>
                         ) : (
-                          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Reserved</Badge>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Reserved</Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Reserved by: {room.reservedByName || 'N/A'}</p>
+                              <p>Reserved at: {room.reservedAt ? new Date(room.reservedAt).toLocaleString() : 'N/A'}</p>
+                              <p>Notes: {room.reservationNotes || 'N/A'}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </TableCell>
                       <TableCell>
@@ -338,14 +377,24 @@ export default function VFastRoomInventory() {
                             </Button>
                           ) : (
                             <>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleMarkAsReserved(room)}
-                                disabled={room.status === RoomStatus.RESERVED}
-                              >
-                                Mark as Reserved
-                              </Button>
+                              {room.status === RoomStatus.RESERVED ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => updateRoomStatusMutation.mutate({ id: room.id, status: RoomStatus.AVAILABLE })}
+                                >
+                                  Mark as Available
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleMarkAsReserved(room)}
+                                  disabled={room.status === RoomStatus.OCCUPIED}
+                                >
+                                  Mark as Reserved
+                                </Button>
+                              )}
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -492,6 +541,26 @@ export default function VFastRoomInventory() {
           </DialogContent>
         </Dialog>
       )}
+      <AlertDialog open={isReserveDialogOpen} onOpenChange={setIsReserveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reserve Room {selectedRoom?.roomNumber}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please provide a reason for reserving this room. This will be visible to other admins and vfast users.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Enter reservation notes..."
+            value={reservationNotes}
+            onChange={(e) => setReservationNotes(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReserve}>Reserve</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
+    </TooltipProvider>
   );
 }

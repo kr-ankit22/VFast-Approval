@@ -170,6 +170,9 @@ export const rooms = pgTable("rooms", {
   floor: integer("floor").notNull(),
   status: text("status").notNull().default(RoomStatus.AVAILABLE),
   features: json("features").default([]),
+  reservedBy: integer("reserved_by").references(() => users.id, { onDelete: "set null" }),
+  reservedAt: timestamp("reserved_at"),
+  reservationNotes: text("reservation_notes"),
 });
 
 // Insert schema for room creation

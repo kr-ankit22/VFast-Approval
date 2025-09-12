@@ -1,0 +1,3 @@
+ALTER TABLE rooms ADD COLUMN reserved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE rooms ADD COLUMN reserved_at TIMESTAMP;
+ALTER TABLE rooms ADD COLUMN reservation_notes TEXT;

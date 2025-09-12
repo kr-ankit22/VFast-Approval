@@ -58,11 +58,11 @@ export interface IStorage {
   // Room operations
   getRoom(id: number): Promise<Room | undefined>;
   getRoomByNumber(roomNumber: string): Promise<Room | undefined>;
-  getAllRooms(): Promise<Room[]>;
+  getAllRooms(): Promise<any[]>;
   getAvailableRoomsByType(type: string): Promise<Room[]>;
   getAllAvailableRooms(): Promise<Room[]>;
   createRoom(room: InsertRoom): Promise<Room>;
-  updateRoomStatus(id: number, status: RoomStatus): Promise<Room | undefined>;
+  updateRoomStatus(id: number, status: RoomStatus, notes?: string, userId?: number): Promise<Room | undefined>;
   
   // Room Maintenance operations
   createRoomMaintenance(maintenance: InsertRoomMaintenance): Promise<RoomMaintenance>;
@@ -252,7 +252,7 @@ export class DatabaseStorage implements IStorage {
           rejectedAt: new Date(),
         };
         updateSet.rejectionHistory = [...(currentBooking.rejectionHistory || []), rejectionEntry];
-        updateSet.status = BookingStatus.PENDING_RECONSIDERATION;
+        // updateSet.status = BookingStatus.PENDING_RECONSIDERATION; // Remove this line
         updateSet.currentWorkflowStage = WorkflowStage.REJECTED;
       } else if (status === BookingStatus.PENDING_ADMIN_APPROVAL) {
         updateSet.departmentApproverId = approverId;
@@ -488,7 +488,8 @@ export class DatabaseStorage implements IStorage {
         const bookingUpdateSet = { 
             roomNumber, 
             status: BookingStatus.ALLOCATED,
-            vfastNotes: notes
+            vfastNotes: notes,
+            currentWorkflowStage: WorkflowStage.ALLOCATED
           };
         const [updatedBooking] = await this.dbClient
           .update(bookings)
@@ -601,9 +602,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAllRooms(): Promise<Room[]> {
+  async getAllRooms(): Promise<any[]> {
     try {
-      return await this.dbClient.select().from(rooms);
+      return await this.dbClient.select({
+        ...rooms,
+        reservedByName: users.name
+      }).from(rooms).leftJoin(users, eq(rooms.reservedBy, users.id));
     } catch (error) {
       // console.error("Error in getAllRooms:", error);
       throw new Error("Failed to retrieve all rooms.");
@@ -654,11 +658,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateRoomStatus(id: number, status: RoomStatus): Promise<Room | undefined> {
+  async updateRoomStatus(id: number, status: RoomStatus, notes?: string, userId?: number): Promise<Room | undefined> {
     try {
+      const currentRoom = await this.getRoom(id);
+      if (!currentRoom) {
+        throw new Error("Room not found");
+      }
+
+      const updateSet: Partial<Room> = { status };
+
+      if (status === RoomStatus.RESERVED) {
+        if (currentRoom.status !== RoomStatus.AVAILABLE) {
+          throw new Error("Only available rooms can be reserved.");
+        }
+        updateSet.reservationNotes = notes;
+        updateSet.reservedBy = userId;
+        updateSet.reservedAt = new Date();
+      } else if (currentRoom.status === RoomStatus.RESERVED && status === RoomStatus.AVAILABLE) {
+        updateSet.reservationNotes = null;
+        updateSet.reservedBy = null;
+        updateSet.reservedAt = null;
+      }
+
       const [room] = await this.dbClient
         .update(rooms)
-        .set({ status })
+        .set(updateSet)
         .where(eq(rooms.id, id))
         .returning();
       return room;
@@ -675,6 +699,14 @@ export class DatabaseStorage implements IStorage {
         .insert(roomMaintenance)
         .values(insertMaintenance)
         .returning();
+
+      // Update the room status to RESERVED
+      await this.dbClient
+        .update(rooms)
+        .set({ status: RoomStatus.RESERVED })
+        .where(eq(rooms.id, insertMaintenance.roomId))
+        .execute();
+
       return maintenance;
     } catch (error) {
       console.error("Error in createRoomMaintenance:", error);
@@ -689,6 +721,19 @@ export class DatabaseStorage implements IStorage {
         .set({ status })
         .where(eq(roomMaintenance.id, id))
         .returning();
+
+      if (status === RoomMaintenanceStatus.COMPLETED) {
+        // Get the room associated with this maintenance entry
+        const room = await this.dbClient.select().from(roomMaintenance).where(eq(roomMaintenance.id, id));
+        if (room && room[0]) {
+          await this.dbClient
+            .update(rooms)
+            .set({ status: RoomStatus.AVAILABLE })
+            .where(eq(rooms.id, room[0].roomId))
+            .execute();
+        }
+      }
+
       return maintenance;
     } catch (error) {
       console.error(`Error in updateRoomMaintenanceStatus for ID ${id}:`, error);
