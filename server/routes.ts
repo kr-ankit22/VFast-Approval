@@ -3,9 +3,10 @@ import { IStorage } from "./storage";
 import { setupAuth } from "./auth";
 import { 
   insertBookingSchema, 
-  updateBookingStatusSchema, 
+  departmentApprovalSchema, 
+  adminApprovalSchema, 
   roomAllocationSchema,
-  InsertGuest, GuestCheckInStatus, WorkflowStage, WorkflowStage,
+    InsertGuest, GuestCheckInStatus, WorkflowStage,
   InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
   BookingStatus
@@ -13,6 +14,8 @@ import {
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import fs from 'fs/promises';
+
+import upload from './upload';
 
 // Middleware to check user role
 const checkRole = (roles: UserRole[]) => {
@@ -31,8 +34,24 @@ const checkRole = (roles: UserRole[]) => {
 };
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<void> {
+  app.get("/test", (req, res) => {
+    console.log("Test route hit!");
+    res.send("Test successful!");
+  });
+
   // Set up authentication routes
   setupAuth(app, storage);
+
+  // Get guest worklist (VFast users)
+  app.get("/api/bookings/worklist", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookings = await storage.getAllocatedBookings();
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error in /api/bookings/worklist:", error);
+      res.status(500).json({ message: "Failed to fetch guest worklist" });
+    }
+  });
 
   // Bookings API
   
@@ -153,6 +172,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Update booking status (Department Approver)
   app.patch("/api/bookings/:id/department-approval", checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
     try {
+      console.log(`[BACKEND] Received department approval request for booking ID: ${req.params.id}`); // ADD THIS LINE
+      console.log("[BACKEND] Request body:", req.body); // ADD THIS LINE
+
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -160,23 +182,35 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
 
+      console.log(`[BACKEND] Status received from frontend: "${status}"`); // ADD THIS LINE
+      console.log(`[BACKEND] Comparing with BookingStatus.APPROVED: "${BookingStatus.APPROVED}"`); // ADD THIS LINE
+      console.log(`[BACKEND] Comparing with BookingStatus.REJECTED: "${BookingStatus.REJECTED}"`); // ADD THIS LINE
+      console.log(`[BACKEND] Is status === BookingStatus.APPROVED? ${status === BookingStatus.APPROVED}`); // ADD THIS LINE
+      console.log(`[BACKEND] Is status === BookingStatus.REJECTED? ${status === BookingStatus.REJECTED}`); // ADD THIS LINE
+
+      console.log(`[BACKEND] Calling updateBookingStatus with status: ${status}`);
+
       if (status !== BookingStatus.APPROVED && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
       }
 
+      // Department approval always transitions to PENDING_ADMIN_APPROVAL
       const booking = await storage.updateBookingStatus({
         id: bookingId,
-        status,
+        status: status, // Use the status received from the frontend
         notes,
         approverId: req.user.id,
-      });
+      }, req.user.role as UserRole);
 
       if (!booking) {
+        console.log(`[BACKEND] Booking ${bookingId} not found.`); // ADD THIS LINE
         return res.status(404).json({ message: "Booking not found" });
       }
 
+      console.log(`[BACKEND] Booking ${bookingId} status updated to: ${status}`); // ADD THIS LINE
       res.json(booking);
     } catch (error) {
+      console.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error); // ADD THIS LINE
       res.status(500).json({ message: "Failed to update booking status" });
     }
   });
@@ -213,18 +247,17 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   app.patch("/api/bookings/:id/status", checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
-      const statusData = updateBookingStatusSchema.parse({
-        id: bookingId,
-        status: req.body.status,
-        notes: req.body.notes,
-        approverId: req.user.id
-      });
+      const statusData = adminApprovalSchema.parse(req.body);
       
-      let updatedBookingData = { ...statusData };
-      if (statusData.status === BookingStatus.APPROVED) {
-        updatedBookingData = { ...updatedBookingData, currentWorkflowStage: WorkflowStage.ALLOCATION_PENDING };
-      }
-      const booking = await storage.updateBookingStatus(updatedBookingData);
+      const booking = await storage.updateBookingStatus(
+        {
+          id: bookingId,
+          status: statusData.status,
+          notes: statusData.notes,
+          approverId: req.user.id,
+        },
+        req.user.role as UserRole
+      );
       
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
@@ -356,6 +389,82 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  // Check-in a guest
+  app.post("/api/guests/:guestId/check-in", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const guest = await storage.updateGuest(guestId, { checkedIn: true, checkInTime: new Date() });
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+
+      // Fetch the booking to check if firstCheckedInGuestName is already set
+      const booking = await storage.getBooking(guest.bookingId);
+      if (booking && !booking.firstCheckedInGuestName) {
+        // If firstCheckedInGuestName is not set, update it with the current guest's name
+        await storage.updateBooking(guest.bookingId, { firstCheckedInGuestName: guest.name });
+        console.log(`Updated booking ${guest.bookingId} with firstCheckedInGuestName: ${guest.name}`); // ADD THIS LINE
+      } else if (booking) {
+        console.log(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`); // ADD THIS LINE
+      }
+      
+      await storage.updateBooking(guest.bookingId, { keyHandedOver: true });
+      res.json(guest);
+    } catch (error) {
+      console.error("Error in /api/guests/:guestId/check-in:", error); // ADD THIS LINE
+      res.status(500).json({ message: "Failed to check-in guest" });
+    }
+  });
+
+  // Check-out a guest
+  app.post("/api/guests/:guestId/check-out", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const { keyHandedOver } = req.body; // Expect keyHandedOver status (e.g., key received)
+      const guest = await storage.updateGuest(guestId, { checkedIn: false, checkOutTime: new Date(), keyHandedOver: keyHandedOver });
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check-out guest" });
+    }
+  });
+
+  // Upload KYC document
+  app.post("/api/guests/:guestId/kyc", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const { kycDocumentUrl } = req.body;
+      const guest = await storage.updateGuest(guestId, { kycDocumentUrl, isVerified: true });
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload KYC document" });
+    }
+  });
+
+  // Upload a generic document for a guest
+  app.post("/api/guests/:guestId/documents", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const { documentType, documentUrl } = req.body; // documentUrl will come from frontend after upload
+
+      // In a real scenario, you'd handle file upload here, save to storage, and get a URL.
+      // For now, we're mocking the upload and expecting a documentUrl from the client.
+      const uploadedUrl = await storage.uploadDocument(documentUrl); // Mocking upload
+
+      // You might want to store these documents in a separate table or as a JSON array in guest table
+      // For simplicity, let's assume kycDocumentUrl is generic for now, or add a new field.
+      // For now, we'll just return the URL and let the frontend decide how to store it.
+      res.status(200).json({ message: "Document uploaded successfully", url: uploadedUrl });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   // Guest Notes Endpoints
 
   // Add a note to a guest
@@ -416,6 +525,34 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  // Check-in a booking (update booking's overall check-in status)
+  app.patch("/api/bookings/:id/check-in", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const booking = await storage.updateBookingCheckInStatus(bookingId, GuestCheckInStatus.CHECKED_IN);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check-in booking" });
+    }
+  });
+
+  // Check-out a booking (update booking's overall check-out status)
+  app.patch("/api/bookings/:id/check-out", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const booking = await storage.updateBookingCheckInStatus(bookingId, GuestCheckInStatus.CHECKED_OUT);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check-out booking" });
+    }
+  });
+
   // Allocate room to booking (VFast users)
   app.patch("/api/bookings/:id/allocate", checkRole([UserRole.VFAST]), async (req, res) => {
     try {
@@ -464,6 +601,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  
+
   // Rooms API
   
   // Get all rooms
@@ -493,6 +632,20 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.json(departments);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch departments" });
+    }
+  });
+
+  // Get a single department
+  app.get("/api/departments/:id", async (req, res) => {
+    try {
+      const departmentId = parseInt(req.params.id);
+      const department = await storage.getDepartment(departmentId);
+      if (!department) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.json(department);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch department" });
     }
   });
   
@@ -632,6 +785,80 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Upload document for a booking
+  app.post("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), upload.single('file'), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const booking = await storage.updateBooking(bookingId, { documentPath: file.path });
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Delete document for a booking
+  app.delete("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const booking = await storage.getBooking(bookingId);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (booking.documentPath) {
+        await fs.unlink(booking.documentPath);
+      }
+
+      const updatedBooking = await storage.updateBooking(bookingId, { documentPath: null });
+
+      res.json(updatedBooking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  app.patch("/api/bookings/:id", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const updates = req.body;
+
+      const booking = await storage.updateBooking(bookingId, updates);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update booking" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/checkout-all", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const booking = await storage.checkOutAllGuests(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check out all guests" });
     }
   });
 }

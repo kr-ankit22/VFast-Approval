@@ -13,13 +13,16 @@ import BookingTable from "@/components/booking/booking-table";
 import RoomAllocationForm from "@/components/booking/room-allocation-form";
 import GuestManagementCard from "@/components/booking/guest-management-card";
 import GuestNotesCard from "@/components/booking/guest-notes-card";
+import GuestNotesSection from "@/components/booking/guest-notes-section";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import BookingDetailsModal from "@/components/booking/booking-details-modal";
 
 export default function BookingWorkflowPage() {
   const [activeTab, setActiveTab] = useState<WorkflowStage>(WorkflowStage.ALLOCATION_PENDING);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const params = useParams();
@@ -30,23 +33,24 @@ export default function BookingWorkflowPage() {
     refetchInterval: 5000, // Refetch every 5 seconds to keep data fresh
   });
 
-  const { data: singleBooking, isLoading: isLoadingSingleBooking } = useQuery<any>({
-    queryKey: bookingIdFromUrl ? [`/api/bookings/${bookingIdFromUrl}`] : [],
-    enabled: !!bookingIdFromUrl,
-  });
-
   useEffect(() => {
-    if (singleBooking) {
-      setSelectedBooking(singleBooking);
-      if (singleBooking.currentWorkflowStage === WorkflowStage.ALLOCATED) {
-        setActiveTab(WorkflowStage.ALLOCATED);
-      } else if (singleBooking.currentWorkflowStage === WorkflowStage.CHECKED_IN) {
-        setActiveTab(WorkflowStage.CHECKED_IN);
-      } else if (singleBooking.currentWorkflowStage === WorkflowStage.CHECKED_OUT) {
-        setActiveTab(WorkflowStage.CHECKED_OUT);
+    if (bookingIdFromUrl && bookings) {
+      const booking = bookings.find(b => b.id === bookingIdFromUrl);
+      if (booking) {
+        setSelectedBooking(booking);
+        if (booking.currentWorkflowStage === WorkflowStage.ALLOCATION_PENDING) {
+          setActiveTab(WorkflowStage.ALLOCATION_PENDING);
+          handleAllocateRoom(booking);
+        } else if (booking.currentWorkflowStage === WorkflowStage.ALLOCATED) {
+          setActiveTab(WorkflowStage.ALLOCATED);
+        } else if (booking.currentWorkflowStage === WorkflowStage.CHECKED_IN) {
+          setActiveTab(WorkflowStage.CHECKED_IN);
+        } else if (booking.currentWorkflowStage === WorkflowStage.CHECKED_OUT) {
+          setActiveTab(WorkflowStage.CHECKED_OUT);
+        }
       }
     }
-  }, [singleBooking]);
+  }, [bookingIdFromUrl, bookings]);
 
   const updateBookingStatusMutation = useMutation({
     mutationFn: async ({ bookingId, status, notes }: { bookingId: number, status: BookingStatus, notes?: string }) => {
@@ -76,6 +80,11 @@ export default function BookingWorkflowPage() {
   const handleAllocateRoom = (booking: any) => {
     setSelectedBooking(booking);
     setIsAllocationDialogOpen(true);
+  };
+
+  const handleViewBooking = (booking: any) => {
+    setSelectedBooking(booking);
+    setIsViewModalOpen(true);
   };
 
   const handleAllocationSuccess = () => {
@@ -113,12 +122,45 @@ export default function BookingWorkflowPage() {
     await updateWorkflowStageMutation.mutateAsync({ bookingId, stage: WorkflowStage.CHECKED_IN, checkInStatus: GuestCheckInStatus.CHECKED_IN });
   };
 
+  const updateRoomStatusMutation = useMutation({
+    mutationFn: async ({ roomId, status }: { roomId: number, status: RoomStatus }) => {
+      const res = await apiRequest("PATCH", `/api/rooms/${roomId}/status`, { status });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update room status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      toast({
+        title: "Room Status Updated",
+        description: "Room status updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update room status.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleMarkBookingCheckedOut = async (bookingId: number) => {
+    const booking = bookings?.find(b => b.id === bookingId);
+    if (booking && booking.roomNumber) {
+      // Find the room ID from the room number
+      const allRooms = await queryClient.fetchQuery({ queryKey: ["/api/rooms"] });
+      const room = allRooms.find((r: any) => r.roomNumber === booking.roomNumber);
+      if (room) {
+        await updateRoomStatusMutation.mutateAsync({ roomId: room.id, status: RoomStatus.AVAILABLE });
+      }
+    }
     await updateWorkflowStageMutation.mutateAsync({ bookingId, stage: WorkflowStage.CHECKED_OUT, checkInStatus: GuestCheckInStatus.CHECKED_OUT });
-    // Also need to update room status to AVAILABLE here
   };
 
-  const allocationBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.ALLOCATION_PENDING) || [];
+  const allocationBookings = bookings?.filter(b => b.status === BookingStatus.APPROVED) || [];
   const allocatedBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.ALLOCATED) || [];
   const checkedInBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.CHECKED_IN) || [];
   const checkedOutBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.CHECKED_IN && new Date(b.checkOutDate) <= new Date()) || [];
@@ -158,6 +200,7 @@ export default function BookingWorkflowPage() {
                   bookings={allocationBookings}
                   renderActions={(booking) => (
                     <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
                       <Button size="sm" onClick={() => handleAllocateRoom(booking)}>Allocate</Button>
                       <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking.id)}>Reject</Button>
                     </div>
@@ -175,7 +218,7 @@ export default function BookingWorkflowPage() {
               <CardTitle>Allocated Bookings - Guest Management & Check-in</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading || isLoadingSingleBooking ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <span className="ml-2">Loading bookings...</span>
@@ -213,7 +256,7 @@ export default function BookingWorkflowPage() {
               <CardTitle>Checked-in Bookings - Stay Experience</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading || isLoadingSingleBooking ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <span className="ml-2">Loading bookings...</span>
@@ -234,21 +277,7 @@ export default function BookingWorkflowPage() {
                       </CardHeader>
                       <CardContent>
                         <GuestManagementCard bookingId={booking.id} />
-                        {/* Display notes for each guest in this booking */}
-                        {/* This would require fetching guests for this booking and then notes for each guest */}
-                        {/* For now, we'll just show a placeholder */}
-                        <Card className="mt-4">
-                          <CardHeader>
-                            <CardTitle>Guest Notes (Placeholder)</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-muted-foreground">Notes for guests in this booking will appear here.</p>
-                            {/* Example of how to use GuestNotesCard if we had guest IDs */}
-                            {/* {booking.guests.map(guest => (
-                              <GuestNotesCard key={guest.id} guestId={guest.id} />
-                            ))} */}
-                          </CardContent>
-                        </Card>
+                        <GuestNotesSection bookingId={booking.id} />
                       </CardContent>
                     </Card>
                   ))}
@@ -265,7 +294,7 @@ export default function BookingWorkflowPage() {
               <CardTitle>Bookings Ready for Check-out</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading || isLoadingSingleBooking ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <span className="ml-2">Loading bookings...</span>
@@ -310,6 +339,19 @@ export default function BookingWorkflowPage() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {selectedBooking && (
+        <BookingDetailsModal
+          booking={selectedBooking}
+          isOpen={isViewModalOpen}
+          onOpenChange={setIsViewModalOpen}
+          userRole={UserRole.VFAST}
+          onAllocate={(booking) => {
+            setIsViewModalOpen(false);
+            handleAllocateRoom(booking);
+          }}
+        />
       )}
     </DashboardLayout>
   );

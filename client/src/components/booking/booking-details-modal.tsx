@@ -21,6 +21,7 @@ interface BookingDetailsModalProps {
   userRole: UserRole;
   onApprove?: (booking: any) => void;
   onReject?: (booking: any) => void;
+  onAllocate?: (booking: any) => void;
 }
 
 // Get room type display name
@@ -86,6 +87,11 @@ const DepartmentAndRoomCard: React.FC<{booking: any}> = ({ booking }) => (
           <p className="text-gray-600">
             {booking.departmentName}
           </p>
+          {booking.departmentNotes && ( // Display department notes here
+            <p className="text-gray-600 mt-2">
+              Department Note: <span className="font-medium">{booking.departmentNotes}</span>
+            </p>
+          )}
           {booking.roomNumber && (
             <p className="text-gray-600 mt-2">
               Assigned Room: <span className="font-medium bg-gray-100 px-2 py-1 rounded">{booking.roomNumber} ({getRoomTypeDisplay(booking.roomType)})</span>
@@ -98,7 +104,7 @@ const DepartmentAndRoomCard: React.FC<{booking: any}> = ({ booking }) => (
 );
 
 const NotesCard: React.FC<{booking: any}> = ({ booking }) => (
-  (booking.specialRequests || booking.adminNotes || booking.vfastNotes) && (
+  (booking.specialRequests || booking.adminNotes || booking.vfastNotes || booking.rejectionHistory?.length > 0) && (
     <Card>
       <CardHeader>
         <CardTitle>Notes & Special Requests</CardTitle>
@@ -131,6 +137,21 @@ const NotesCard: React.FC<{booking: any}> = ({ booking }) => (
             </div>
           </div>
         )}
+        
+        {booking.rejectionHistory && booking.rejectionHistory.length > 0 && (
+          <div className="flex items-start space-x-3">
+            <FileText className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium">Rejection History</p>
+              {booking.rejectionHistory.map((rejection: any, index: number) => (
+                <div key={index} className="mb-2">
+                  <p className="text-xs text-gray-500">Rejected on {formatDate(new Date(rejection.rejectedAt))}</p>
+                  <p className="text-gray-600">Reason: {rejection.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -142,14 +163,16 @@ export default function BookingDetailsModal({
   onOpenChange, 
   userRole, 
   onApprove, 
-  onReject 
+  onReject, 
+  onAllocate
 }: BookingDetailsModalProps) {
   if (!booking) return null;
 
   const canTakeAction = 
     (userRole === UserRole.ADMIN && (booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.PENDING_RECONSIDERATION)) ||
-    (userRole === UserRole.DEPARTMENT_APPROVER && booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL) ||
-    (userRole === UserRole.VFAST && booking.status === BookingStatus.APPROVED);
+    (userRole === UserRole.DEPARTMENT_APPROVER && booking.status === BookingStatus.PENDING_DEPARTMENT_APPROVAL);
+
+  const canAllocate = userRole === UserRole.VFAST && booking.status === BookingStatus.APPROVED;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -200,11 +223,21 @@ export default function BookingDetailsModal({
                   onApprove(booking);
                 }}
               >
-                {userRole === UserRole.VFAST ? "Allocate Room" : "Approve"}
+                Approve
               </Button>
             </>
           )}
-          {!canTakeAction && (
+          {canAllocate && onAllocate && (
+            <Button 
+              onClick={() => {
+                onOpenChange(false);
+                onAllocate(booking);
+              }}
+            >
+              Allocate Room
+            </Button>
+          )}
+          {!canTakeAction && !canAllocate && (
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           )}
         </DialogFooter>

@@ -41,6 +41,7 @@ export enum GuestCheckInStatus {
 
 // Booking Workflow Stage enum
 export enum WorkflowStage {
+  PENDING_APPROVALS = "pending_approvals",
   ALLOCATION_PENDING = "allocation_pending",
   ALLOCATED = "allocated",
   CHECKED_IN = "checked_in",
@@ -103,6 +104,7 @@ export const bookings = pgTable("bookings", {
   roomNumber: text("room_number"),
   adminNotes: text("admin_notes"),
   vfastNotes: text("vfast_notes"),
+  departmentNotes: text("department_notes"), // New column for department approver notes
   departmentApproverId: integer("department_approver_id").references(() => users.id),
   adminApproverId: integer("admin_approver_id").references(() => users.id),
   departmentApprovalAt: timestamp("department_approval_at"),
@@ -114,8 +116,11 @@ export const bookings = pgTable("bookings", {
   reconsiderationCount: integer("reconsideration_count").default(0),
   reconsideredFromId: integer("reconsidered_from_id"),
   isDeleted: boolean("is_deleted").default(false),
-  currentWorkflowStage: text("current_workflow_stage").notNull().default(WorkflowStage.ALLOCATION_PENDING),
+  currentWorkflowStage: text("current_workflow_stage"),
   checkInStatus: text("check_in_status").notNull().default(GuestCheckInStatus.PENDING_CHECK_IN),
+  documentPath: text("document_path"),
+  keyHandedOver: boolean("key_handed_over").default(false),
+  firstCheckedInGuestName: text("first_checked_in_guest_name"), // New column
 });
 
 // Insert schema for booking creation
@@ -136,23 +141,18 @@ export const insertBookingSchema = createInsertSchema(bookings)
     reconsiderationCount: true,
     reconsideredFromId: true,
     isDeleted: true,
-    currentWorkflowStage: true,
     checkInStatus: true,
   });
 
 // Update schema for booking status
-export const updateBookingStatusSchema = z.object({
-  id: z.number(),
-  status: z.enum([
-    BookingStatus.PENDING_DEPARTMENT_APPROVAL,
-    BookingStatus.PENDING_ADMIN_APPROVAL,
-    BookingStatus.APPROVED, 
-    BookingStatus.REJECTED, 
-    BookingStatus.ALLOCATED,
-    BookingStatus.PENDING_RECONSIDERATION
-  ]),
+export const departmentApprovalSchema = z.object({
+  status: z.enum([BookingStatus.APPROVED, BookingStatus.REJECTED]),
   notes: z.string().optional(),
-  approverId: z.number().optional(),
+});
+
+export const adminApprovalSchema = z.object({
+  status: z.enum([BookingStatus.APPROVED, BookingStatus.REJECTED]),
+  notes: z.string().optional(),
 });
 
 // Room allocation schema
@@ -204,6 +204,13 @@ export const guests = pgTable("guests", {
   checkedIn: boolean("checked_in").notNull().default(false),
   checkInTime: timestamp("check_in_time"),
   checkOutTime: timestamp("check_out_time"),
+  origin: text("origin"),
+  spocName: text("spoc_name"),
+  spocContact: text("spoc_contact"),
+  foodPreferences: text("food_preferences"),
+  otherSpecialRequests: text("other_special_requests"),
+  travelDetails: json("travel_details"),
+  citizenCategory: text("citizen_category"),
 });
 
 export const roomMaintenance = pgTable("room_maintenance", {
@@ -228,6 +235,7 @@ export const guestNotes = pgTable("guest_notes", {
   note: text("note").notNull(),
   timestamp: timestamp("timestamp").defaultNow(),
   type: text("type"),
+  category: text("category"),
 });
 
 export type GuestNote = typeof guestNotes.$inferSelect;
