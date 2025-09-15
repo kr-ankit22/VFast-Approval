@@ -58,21 +58,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
       
-      // Force a hard navigation to ensure state is refreshed
-      setTimeout(() => {
-        // Redirect to appropriate dashboard based on user role
-        const redirectPath = user.role === UserRole.BOOKING 
-          ? "/booking" 
-          : user.role === UserRole.DEPARTMENT_APPROVER
-            ? "/department"
-            : user.role === UserRole.ADMIN
-            ? "/admin"
-            : user.role === UserRole.VFAST
-              ? "/vfast"
-              : "/";
-              
-        window.location.href = redirectPath;
-      }, 100);
+      // Redirect to appropriate dashboard based on user role
+      const redirectPath = user.role === UserRole.BOOKING 
+        ? "/booking" 
+        : user.role === UserRole.DEPARTMENT_APPROVER
+          ? "/department"
+          : user.role === UserRole.ADMIN
+          ? "/admin"
+          : user.role === UserRole.VFAST
+            ? "/vfast"
+            : "/";
+            
+      setLocation(redirectPath);
     },
     onError: (error: Error) => {
       toast({
@@ -102,21 +99,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
       
-      // Force a hard navigation to ensure state is refreshed
-      setTimeout(() => {
-        // Redirect to appropriate dashboard based on user role
-        const redirectPath = user.role === UserRole.BOOKING 
-          ? "/booking" 
-          : user.role === UserRole.DEPARTMENT_APPROVER
-            ? "/department"
-            : user.role === UserRole.ADMIN
-            ? "/admin"
-            : user.role === UserRole.VFAST
-              ? "/vfast"
-              : "/";
-              
-        window.location.href = redirectPath;
-      }, 100);
+      // Redirect to appropriate dashboard based on user role
+      const redirectPath = user.role === UserRole.BOOKING 
+        ? "/booking" 
+        : user.role === UserRole.DEPARTMENT_APPROVER
+          ? "/department"
+          : user.role === UserRole.ADMIN
+          ? "/admin"
+          : user.role === UserRole.VFAST
+            ? "/vfast"
+            : "/";
+            
+      setLocation(redirectPath);
     },
     onError: (error: Error) => {
       toast({
@@ -135,8 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear all query cache to ensure clean state
       queryClient.clear();
       
-      // Force redirect to auth page
-      window.location.href = "/auth";
+      // Redirect to auth page
+      setLocation("/auth");
       
       toast({
         title: "Logged out",

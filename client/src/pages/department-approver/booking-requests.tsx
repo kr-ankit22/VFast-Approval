@@ -94,7 +94,7 @@ export default function DepartmentBookingRequests() {
     
     updateBookingStatusMutation.mutate({
       id: selectedBooking.id,
-      status: BookingStatus.PENDING_ADMIN_APPROVAL,
+      status: BookingStatus.APPROVED, // Changed to APPROVED
       notes: departmentNotes,
     });
   };

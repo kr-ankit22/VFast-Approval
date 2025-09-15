@@ -37,13 +37,14 @@ import { useLocation } from "wouter";
 
 // Extend the schema for form validation
 const formSchema = insertBookingSchema.extend({
-  checkInDate: z.date({
-    required_error: "Please select a check-in date",
-  }),
-  checkOutDate: z.date({
-    required_error: "Please select a check-out date",
-  }),
-  department_id: z.coerce.number().min(1, "Please select a department"),
+  purpose: z.string().min(1, "Please select a purpose"),
+  // checkInDate: z.date({
+  //   required_error: "Please select a check-in date",
+  // }),
+  // checkOutDate: z.date({
+  //   required_error: "Please select a check-out date",
+  // }),
+  // department_id: z.coerce.number().min(1, "Please select a department"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,8 +69,9 @@ export default function BookingForm() {
   // Default form values
   const defaultValues: Partial<FormValues> = {
     purpose: "",
-    guestCount: 1,
-    specialRequests: "",
+    // guestCount: 1,
+    // specialRequests: "",
+    // department_id: undefined,
   };
 
   const form = useForm<FormValues>({
@@ -154,7 +156,7 @@ export default function BookingForm() {
             )}
           />
 
-          <FormField
+          {/* <FormField
             control={form.control}
             name="guestCount"
             render={({ field }) => (
@@ -175,10 +177,10 @@ export default function BookingForm() {
                 <FormMessage />
               </FormItem>
             )}
-          />
+          /> */}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="checkInDate"
@@ -266,7 +268,7 @@ export default function BookingForm() {
               </FormItem>
             )}
           />
-        </div>
+        </div> */}
 
         <FormField
           control={form.control}
@@ -280,7 +282,7 @@ export default function BookingForm() {
                     field.onChange(parseInt(value, 10));
                   }
                 }}
-                defaultValue={String(field.value)}
+                value={field.value ? String(field.value) : ""}
               >
                 <FormControl>
                   <SelectTrigger>

@@ -9,6 +9,7 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
   const app = express();
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
+  app.use('/uploads', express.static('uploads'));
 
   // Custom logging middleware
   // app.use((req, res, next) => {

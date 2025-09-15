@@ -112,13 +112,13 @@ export default function DashboardLayout({
         icon: LayoutDashboard,
       },
       {
-        name: "Room Allocation",
-        href: "/vfast/allocation",
+        name: "Pending Allocation",
+        href: "/vfast/workflow",
         icon: Calendar,
       },
       {
-        name: "Reconsideration",
-        href: "/vfast/reconsideration",
+        name: "Guest Worklist",
+        href: "/vfast/guest-worklist",
         icon: Users,
       },
     ],

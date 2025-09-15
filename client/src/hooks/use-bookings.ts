@@ -194,3 +194,63 @@ export const useGetRooms = () => {
     queryFn: fetchRooms,
   });
 };
+
+const fetchGuestWorklist = async (): Promise<any[]> => {
+  const response = await fetch("/api/bookings/worklist");
+  if (!response.ok) {
+    throw new Error("Failed to fetch guest worklist");
+  }
+  const data = await response.json();
+  console.log("Guest worklist data:", data);
+  return data;
+};
+
+export const useGetGuestWorklist = () => {
+  return useQuery<any[], Error>({
+    queryKey: ["guest-worklist"],
+    queryFn: fetchGuestWorklist,
+  });
+};
+
+const checkInBooking = async (bookingId: number): Promise<Booking> => {
+  const response = await fetch(`/api/bookings/${bookingId}/check-in`, {
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to check-in booking");
+  }
+  return response.json();
+};
+
+export const useCheckInBooking = () => {
+  const queryClient = useQueryClient();
+  return useMutation<Booking, Error, number>({
+    mutationFn: checkInBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["guest-worklist"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+  });
+};
+
+const checkOutBooking = async (bookingId: number): Promise<Booking> => {
+  const response = await fetch(`/api/bookings/${bookingId}/check-out`, {
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to check-out booking");
+  }
+  return response.json();
+};
+
+export const useCheckOutBooking = () => {
+  const queryClient = useQueryClient();
+  return useMutation<Booking, Error, number>({
+    mutationFn: checkOutBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["guest-worklist"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] }); // Invalidate rooms to reflect availability
+    },
+  });
+};

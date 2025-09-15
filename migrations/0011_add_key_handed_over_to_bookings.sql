@@ -1,0 +1,1 @@
+ALTER TABLE "bookings" ADD COLUMN "key_handed_over" boolean DEFAULT false;

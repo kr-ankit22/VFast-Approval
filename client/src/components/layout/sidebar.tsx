@@ -64,11 +64,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
       case UserRole.VFAST:
         return [
           { href: "/vfast", icon: <Home size={18} />, label: "Dashboard" },
-          { href: "/vfast/workflow", icon: <DoorOpen size={18} />, label: "Booking Workflow" },
-          { href: "/vfast/guest-worklist", icon: <ClipboardList size={18} />, label: "Guest Management" },
+          
+          { href: "/vfast/allocation", icon: <ClipboardList size={18} />, label: "Pending Allocation" },
+          { href: "/vfast/guest-worklist", icon: <ClipboardList size={18} />, label: "Guest Worklist" },
           { href: "/vfast/reconsideration", icon: <RefreshCw size={18} />, label: "Reconsideration Requests" },
           { href: "/vfast/all-booking-requests", icon: <ClipboardList size={18} />, label: "All Booking Requests" },
-          { href: "/vfast/room-inventory", icon: <Hotel size={18} />, label: "Room Inventory" },
+          
           { href: "/vfast/settings", icon: <Settings size={18} />, label: "Settings" }
         ];
       default:

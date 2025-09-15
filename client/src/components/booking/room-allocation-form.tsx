@@ -3,7 +3,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Booking, Room, RoomType, roomAllocationSchema, RoomStatus } from "@shared/schema";
+import { Booking, Room, RoomType, roomAllocationSchema, RoomStatus, WorkflowStage } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Form,
@@ -61,15 +61,21 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
 
   const allocateRoomMutation = useMutation({
     mutationFn: async (data: FormSchema) => {
+      const url = `/api/bookings/${booking.id}/allocate`;
+      console.log("[RoomAllocationForm] Sending PATCH request to URL:", url, "with data:", data);
       const res = await apiRequest(
         "PATCH",
-        `/api/bookings/${booking.id}/allocate`,
+        url,
         data
       );
       return await res.json();
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      // Also update the workflow stage of the specific booking
+      await queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking.id}`] });
+      // Manually update the workflow stage in the backend
+      await apiRequest("PATCH", `/api/bookings/${booking.id}/workflow-stage`, { stage: WorkflowStage.ALLOCATED });
       toast({
         title: "Room Allocated",
         description: `Room ${form.getValues().roomNumber} has been successfully allocated.`,
@@ -92,85 +98,86 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
   };
 
   function onSubmit(data: FormSchema) {
+    console.log("[RoomAllocationForm] onSubmit triggered, data:", data);
     allocateRoomMutation.mutate(data);
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="roomNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Available Rooms</FormLabel>
-              <Select onValueChange={handleRoomSelection} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a room" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {isLoadingRooms ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    </div>
-                  ) : isRoomsError ? (
-                    <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
-                  ) : availableRooms && availableRooms.length > 0 ? (
-                    availableRooms.map((room) => (
-                      <SelectItem key={room.roomNumber} value={room.roomNumber}>
-                        {room.roomNumber} ({room.type}) - {room.status}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-2 text-gray-500 text-sm">No available rooms</div>
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {selectedRoom && (
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle>Selected Room Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p><strong>Type:</strong> {selectedRoom.type}</p>
-              <p><strong>Floor:</strong> {selectedRoom.floor}</p>
-              <p><strong>Features:</strong> {selectedRoom.features?.join(", ")}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Allocation Notes</FormLabel>
+      <FormField
+        control={form.control}
+        name="roomNumber"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Available Rooms</FormLabel>
+            <Select onValueChange={handleRoomSelection} value={field.value}>
               <FormControl>
-                <Textarea
-                  placeholder="Add any relevant notes..."
-                  rows={3}
-                  {...field}
-                />
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a room" />
+                </SelectTrigger>
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              <SelectContent>
+                {isLoadingRooms ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  </div>
+                ) : isRoomsError ? (
+                  <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
+                ) : availableRooms && availableRooms.length > 0 ? (
+                  availableRooms.map((room) => (
+                    <SelectItem key={room.roomNumber} value={room.roomNumber}>
+                      {room.roomNumber} ({room.type}) - {room.status}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-gray-500 text-sm">No available rooms</div>
+                )}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
-        <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
-          <Button type="submit" disabled={allocateRoomMutation.isPending || !form.getValues().roomNumber}>
-            {allocateRoomMutation.isPending ? "Allocating..." : "Assign Room"}
-          </Button>
-        </div>
-      </form>
+      {selectedRoom && (
+        <Card className="border-dashed">
+          <CardHeader className="pb-2">
+            <CardTitle>Selected Room Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p><strong>Type:</strong> {selectedRoom.type}</p>
+            <p><strong>Floor:</strong> {selectedRoom.floor}</p>
+            <p><strong>Features:</strong> {selectedRoom.features?.join(", ")}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <FormField
+        control={form.control}
+        name="notes"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Allocation Notes</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder="Add any relevant notes..."
+                rows={3}
+                {...field}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="flex justify-end space-x-4">
+        <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
+        <Button type="submit" disabled={allocateRoomMutation.isPending || !form.getValues().roomNumber}>
+          {allocateRoomMutation.isPending ? "Allocating..." : "Assign Room"}
+        </Button>
+      </div>
+    </form>
     </Form>
   );
 }

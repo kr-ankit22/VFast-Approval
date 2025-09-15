@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { UserRole, BookingStatus, type Booking, type Room, RoomStatus } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
@@ -30,6 +30,11 @@ import { formatDate } from "@/lib/utils";
 export default function VFastDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [, setLocation] = useLocation();
+
+  const handleAllocateRoom = (booking: Booking) => {
+    setLocation(`/vfast/workflow/${booking.id}`);
+  };
 
   // Get all bookings
   const { data: allBookings = [], isLoading: isLoadingBookings } = useQuery<Booking[]>({
@@ -174,11 +179,9 @@ export default function VFastDashboard() {
                               <td className="py-3 px-4">{formatDate(new Date(booking.checkInDate))}</td>
                               <td className="py-3 px-4">{renderStatusBadge(booking.status)}</td>
                               <td className="py-3 px-4">
-                                <Link href={`/vfast/allocation/${booking.id}`}>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <ArrowUpRight className="h-4 w-4" />
-                                  </Button>
-                                </Link>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleAllocateRoom(booking)}>
+                                  <ArrowUpRight className="h-4 w-4" />
+                                </Button>
                               </td>
                             </tr>
                           ))}
@@ -187,7 +190,7 @@ export default function VFastDashboard() {
                     </div>
                   )}
                   <div className="mt-4 text-right">
-                    <Link href="/vfast/allocation">
+                    <Link href="/vfast/workflow">
                       <Button variant="outline" size="sm">View All Pending Allocations</Button>
                     </Link>
                   </div>
@@ -309,20 +312,7 @@ export default function VFastDashboard() {
 
         <TabsContent value="actions" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Room Allocation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-4">Allocate rooms to approved booking requests</p>
-                <Link href="/vfast/allocation">
-                  <Button className="flex items-center gap-2">
-                    <HotelIcon className="h-4 w-4" />
-                    Allocate Rooms
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+            
 
             <Card>
               <CardHeader>

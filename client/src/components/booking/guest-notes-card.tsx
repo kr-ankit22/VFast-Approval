@@ -23,7 +23,7 @@ interface GuestNotesCardProps {
 
 const addNoteFormSchema = z.object({
   note: z.string().min(5, "Note must be at least 5 characters.").max(500, "Note cannot exceed 500 characters."),
-  type: z.string().optional(),
+  category: z.enum(["Stay Issue", "Request", "Feedback", "Operational", "General"]).default("General"),
 });
 
 export default function GuestNotesCard({ guestId }: GuestNotesCardProps) {
@@ -40,7 +40,7 @@ export default function GuestNotesCard({ guestId }: GuestNotesCardProps) {
     resolver: zodResolver(addNoteFormSchema),
     defaultValues: {
       note: "",
-      type: "general",
+      category: "General",
     },
   });
 
@@ -105,7 +105,7 @@ export default function GuestNotesCard({ guestId }: GuestNotesCardProps) {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-semibold">{note.note}</p>
-                    <p className="text-sm text-muted-foreground">Type: {note.type || "General"}</p>
+                    <p className="text-sm text-muted-foreground">Category: {note.category || "General"}</p>
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <CalendarDays className="h-3 w-3" />
@@ -144,21 +144,22 @@ export default function GuestNotesCard({ guestId }: GuestNotesCardProps) {
               />
               <FormField
                 control={addNoteForm.control}
-                name="type"
+                name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Note Type</FormLabel>
+                    <FormLabel>Note Category</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a type" />
+                          <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="food_preference">Food Preference</SelectItem>
-                        <SelectItem value="incident">Incident</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="General">General</SelectItem>
+                        <SelectItem value="Stay Issue">Stay Issue</SelectItem>
+                        <SelectItem value="Request">Request</SelectItem>
+                        <SelectItem value="Feedback">Feedback</SelectItem>
+                        <SelectItem value="Operational">Operational</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

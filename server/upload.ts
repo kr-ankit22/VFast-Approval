@@ -1,0 +1,32 @@
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = 'uploads/documents';
+    // Ensure the directory exists
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const bookingId = req.params.bookingId;
+    const ext = path.extname(file.originalname);
+    const filename = `${bookingId}-${Date.now()}${ext}`;
+    cb(null, filename);
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    console.log('Uploaded file mimetype:', file.mimetype);
+    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .zip files are allowed!'));
+    }
+  },
+});
+
+export default upload;

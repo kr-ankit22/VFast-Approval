@@ -10,10 +10,15 @@ interface BookingStatusBadgeProps {
 export default function BookingStatusBadge({ status, className }: BookingStatusBadgeProps) {
   const getStatusConfig = () => {
     switch (status) {
-      case BookingStatus.PENDING:
+      case BookingStatus.PENDING_DEPARTMENT_APPROVAL:
         return {
           className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-          label: "Pending"
+          label: "Pending Dept. Approval"
+        };
+      case BookingStatus.PENDING_ADMIN_APPROVAL:
+        return {
+          className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+          label: "Pending Admin Approval"
         };
       case BookingStatus.APPROVED:
         return {
@@ -25,10 +30,15 @@ export default function BookingStatusBadge({ status, className }: BookingStatusB
           className: "bg-red-100 text-red-800 hover:bg-red-100",
           label: "Rejected"
         };
-      case BookingStatus.ALLOCATED:
+      case Booking.ALLOCATED:
         return {
           className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
           label: "Allocated"
+        };
+      case BookingStatus.PENDING_RECONSIDERATION:
+        return {
+          className: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+          label: "Pending Reconsideration"
         };
       default:
         return {

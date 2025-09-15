@@ -38,10 +38,12 @@ export default function DepartmentApprovalTable({ bookings }: DepartmentApproval
   });
 
   const handleApprove = (bookingId: number) => {
-    updateBookingStatusMutation.mutate({ bookingId, status: BookingStatus.PENDING_ADMIN_APPROVAL });
+    console.log(`Attempting to approve booking: ${bookingId}`);
+    updateBookingStatusMutation.mutate({ bookingId, status: BookingStatus.APPROVED });
   };
 
   const handleReject = (bookingId: number) => {
+    console.log(`Attempting to reject booking: ${bookingId}`); // ADD THIS LINE
     updateBookingStatusMutation.mutate({ bookingId, status: BookingStatus.REJECTED });
   };
 

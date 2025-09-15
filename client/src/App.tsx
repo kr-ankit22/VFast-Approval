@@ -32,6 +32,7 @@ import VFastAllBookingRequests from "@/pages/vfast/all-booking-requests";
 import VFastRoomInventory from "@/pages/vfast/room-inventory";
 import RoomAvailabilityPage from "@/pages/vfast/room-availability";
 import GuestWorklistPage from "@/pages/vfast/guest-worklist";
+import PendingAllocations from "@/pages/vfast/pending-allocations";
 
 import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
 
@@ -63,13 +64,14 @@ function Router() {
       
       {/* VFast Routes */}
       <ProtectedRoute path="/vfast" component={VFastDashboard} role={UserRole.VFAST} />
-      <ProtectedRoute path="/vfast/workflow" component={BookingWorkflowPage} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/workflow/:id?" component={BookingWorkflowPage} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/reconsideration" component={Reconsideration} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/all-booking-requests" component={VFastAllBookingRequests} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/all-booking-requests/:id" component={VFastAllBookingRequests} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/room-inventory" component={VFastRoomInventory} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/room-availability" component={RoomAvailabilityPage} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/guest-worklist" component={GuestWorklistPage} role={UserRole.VFAST} />
+      <ProtectedRoute path="/vfast/allocation" component={PendingAllocations} role={UserRole.VFAST} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
@@ -77,8 +79,19 @@ function Router() {
   );
 }
 
+import { AuthProvider } from "./hooks/use-auth";
+
 function App() {
-  return <Router />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
 }
 
 export default App;
