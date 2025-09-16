@@ -80,6 +80,9 @@ export interface IStorage {
   // Department operations
   getAllDepartments(): Promise<Department[]>;
   getDepartment(id: number): Promise<Department | undefined>;
+
+  // Stats
+  getVFastAllocationStats(): Promise<any>;
 }
 
 export function initializeStorage(dbInstance: typeof db, poolInstance: typeof pool): IStorage {
@@ -304,9 +307,7 @@ export class DatabaseStorage implements IStorage {
 
   async getBookingsByStatus(status: BookingStatus): Promise<Booking[]> {
     try {
-      console.log(`Executing query for status: ${status}`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.status, status));
-      console.log('getBookingsByStatus result:', result);
       return result;
     } catch (error: any) {
       console.error(`Error in getBookingsByStatus for status ${status}:`, error);
@@ -931,7 +932,6 @@ export class DatabaseStorage implements IStorage {
         .groupBy(bookings.id, users.name, rooms.roomNumber, bookings.firstCheckedInGuestName) // Group by booking details including new column
         .execute(); // Execute the query
 
-      console.log("getAllocatedBookings result:", result); // ADD THIS LINE
       return result;
     } catch (error: any) {
       console.error("Error in getAllocatedBookings:", error);
@@ -1070,6 +1070,26 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       console.error(`Error in getDepartment for ID ${id}:`, error);
       throw new Error("Failed to retrieve department.");
+    }
+  }
+
+  // Stats
+  async getVFastAllocationStats(): Promise<any> {
+    try {
+      const pendingAllocations = await this.dbClient.select({ count: sql<number>`count(*)` }).from(bookings).where(eq(bookings.status, BookingStatus.APPROVED));
+      const roomsAvailableToday = await this.dbClient.select({ count: sql<number>`count(*)` }).from(rooms).where(eq(rooms.status, RoomStatus.AVAILABLE));
+      const upcomingCheckouts = await this.dbClient.select({ count: sql<number>`count(*)` }).from(bookings).where(and(eq(bookings.status, BookingStatus.ALLOCATED), gte(bookings.checkOutDate, new Date()), lte(bookings.checkOutDate, new Date(new Date().getTime() + 24 * 60 * 60 * 1000))));
+
+      const stats = {
+        pendingAllocations: pendingAllocations[0].count,
+        roomsAvailableToday: roomsAvailableToday[0].count,
+        upcomingCheckouts: upcomingCheckouts[0].count,
+      };
+
+      return stats;
+    } catch (error: any) {
+      console.error("Error in getVFastAllocationStats:", error);
+      throw new Error("Failed to retrieve VFast allocation stats.");
     }
   }
 }

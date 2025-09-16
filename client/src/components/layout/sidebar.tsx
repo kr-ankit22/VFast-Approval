@@ -65,7 +65,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         return [
           { href: "/vfast", icon: <Home size={18} />, label: "Dashboard" },
           
-          { href: "/vfast/allocation", icon: <ClipboardList size={18} />, label: "Pending Allocation" },
+          { href: "/vfast/workflow", icon: <ClipboardList size={18} />, label: "Room Allocation" },
           { href: "/vfast/guest-worklist", icon: <ClipboardList size={18} />, label: "Guest Worklist" },
           { href: "/vfast/reconsideration", icon: <RefreshCw size={18} />, label: "Reconsideration Requests" },
           { href: "/vfast/all-booking-requests", icon: <ClipboardList size={18} />, label: "All Booking Requests" },

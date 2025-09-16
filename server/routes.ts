@@ -53,6 +53,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  app.get("/api/stats/vfast-allocation", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const stats = await storage.getVFastAllocationStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch VFast allocation stats", error: error.message });
+    }
+  });
+
   // Bookings API
   
   // Get all bookings (Admin & VFast users)
@@ -585,9 +594,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     try {
       const bookings = await storage.getBookingsByStatus(BookingStatus.APPROVED);
       res.json(bookings);
-    } catch (error) {
-      // console.error("Failed to fetch approved bookings:", error);
-      res.status(500).json({ message: "Failed to fetch approved bookings" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch approved bookings", error: error.message });
     }
   });
   

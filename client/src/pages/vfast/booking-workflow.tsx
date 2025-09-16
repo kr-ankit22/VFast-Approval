@@ -1,60 +1,54 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, WorkflowStage, GuestCheckInStatus } from "@shared/schema";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserRole, BookingStatus, WorkflowStage } from "@shared/schema";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, ArrowUpRight } from "lucide-react";
-import { Link, useParams } from "wouter";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
-import BookingTable from "@/components/booking/booking-table";
+import AllocationTable from "@/components/booking/allocation-table";
 import RoomAllocationForm from "@/components/booking/room-allocation-form";
-import GuestManagementCard from "@/components/booking/guest-management-card";
-import GuestNotesCard from "@/components/booking/guest-notes-card";
-import GuestNotesSection from "@/components/booking/guest-notes-section";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import BookingDetailsModal from "@/components/booking/booking-details-modal";
 
 export default function BookingWorkflowPage() {
-  const [activeTab, setActiveTab] = useState<WorkflowStage>(WorkflowStage.ALLOCATION_PENDING);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const params = useParams();
-  const bookingIdFromUrl = params.id ? parseInt(params.id) : null;
 
   const { data: bookings, isLoading } = useQuery<any[]>({
     queryKey: ["/api/bookings"],
-    refetchInterval: 5000, // Refetch every 5 seconds to keep data fresh
+    refetchInterval: 5000,
   });
 
-  useEffect(() => {
-    if (bookingIdFromUrl && bookings) {
-      const booking = bookings.find(b => b.id === bookingIdFromUrl);
-      if (booking) {
-        setSelectedBooking(booking);
-        if (booking.currentWorkflowStage === WorkflowStage.ALLOCATION_PENDING) {
-          setActiveTab(WorkflowStage.ALLOCATION_PENDING);
-          handleAllocateRoom(booking);
-        } else if (booking.currentWorkflowStage === WorkflowStage.ALLOCATED) {
-          setActiveTab(WorkflowStage.ALLOCATED);
-        } else if (booking.currentWorkflowStage === WorkflowStage.CHECKED_IN) {
-          setActiveTab(WorkflowStage.CHECKED_IN);
-        } else if (booking.currentWorkflowStage === WorkflowStage.CHECKED_OUT) {
-          setActiveTab(WorkflowStage.CHECKED_OUT);
-        }
-      }
-    }
-  }, [bookingIdFromUrl, bookings]);
+  const { data: stats, isLoading: isLoadingStats } = useQuery<any>({
+    queryKey: ["/api/stats/vfast-allocation"],
+    refetchInterval: 5000,
+  });
+
+  const handleAllocateRoom = (booking: any) => {
+    setSelectedBooking(booking);
+    setIsAllocationDialogOpen(true);
+  };
+
+  const handleViewBooking = (booking: any) => {
+    setSelectedBooking(booking);
+    setIsViewModalOpen(true);
+  };
+
+  const handleAllocationSuccess = () => {
+    setIsAllocationDialogOpen(false);
+    setSelectedBooking(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/stats/vfast-allocation"] });
+  };
 
   const updateBookingStatusMutation = useMutation({
     mutationFn: async ({ bookingId, status, notes }: { bookingId: number, status: BookingStatus, notes?: string }) => {
-      const res = await apiRequest("PATCH", `/api/bookings/${bookingId}/status`, { status, notes, approverId: 1 }); // Assuming admin user for now
+      const res = await apiRequest("PATCH", `/api/bookings/${bookingId}/status`, { status, notes, approverId: 1 });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to update booking status");
@@ -77,256 +71,74 @@ export default function BookingWorkflowPage() {
     },
   });
 
-  const handleAllocateRoom = (booking: any) => {
-    setSelectedBooking(booking);
-    setIsAllocationDialogOpen(true);
-  };
-
-  const handleViewBooking = (booking: any) => {
-    setSelectedBooking(booking);
-    setIsViewModalOpen(true);
-  };
-
-  const handleAllocationSuccess = () => {
-    setIsAllocationDialogOpen(false);
-    setSelectedBooking(null);
-    // After allocation, move to Guest Management tab
-    setActiveTab(WorkflowStage.ALLOCATED);
-  };
-
   const handleRejectBooking = async (bookingId: number) => {
     await updateBookingStatusMutation.mutateAsync({ bookingId, status: BookingStatus.REJECTED, notes: "Rejected by VFast user during allocation." });
   };
 
-  const handleCheckInGuest = async (guestId: number) => {
-    // Implement API call to update guest check-in status
-    toast({
-      title: "Guest Check-in",
-      description: `Guest ${guestId} checked in (simulated).`,
-    });
-    // Invalidate guests query for this booking
-    queryClient.invalidateQueries({ queryKey: [`/api/bookings/${selectedBooking.id}/guests`] });
-  };
-
-  const handleCheckOutGuest = async (guestId: number) => {
-    // Implement API call to update guest check-out status
-    toast({
-      title: "Guest Check-out",
-      description: `Guest ${guestId} checked out (simulated).`,
-    });
-    // Invalidate guests query for this booking
-    queryClient.invalidateQueries({ queryKey: [`/api/bookings/${selectedBooking.id}/guests`] });
-  };
-
-  const handleMarkBookingCheckedIn = async (bookingId: number) => {
-    await updateWorkflowStageMutation.mutateAsync({ bookingId, stage: WorkflowStage.CHECKED_IN, checkInStatus: GuestCheckInStatus.CHECKED_IN });
-  };
-
-  const updateRoomStatusMutation = useMutation({
-    mutationFn: async ({ roomId, status }: { roomId: number, status: RoomStatus }) => {
-      const res = await apiRequest("PATCH", `/api/rooms/${roomId}/status`, { status });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to update room status");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
-      toast({
-        title: "Room Status Updated",
-        description: "Room status updated successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update room status.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleMarkBookingCheckedOut = async (bookingId: number) => {
-    const booking = bookings?.find(b => b.id === bookingId);
-    if (booking && booking.roomNumber) {
-      // Find the room ID from the room number
-      const allRooms = await queryClient.fetchQuery({ queryKey: ["/api/rooms"] });
-      const room = allRooms.find((r: any) => r.roomNumber === booking.roomNumber);
-      if (room) {
-        await updateRoomStatusMutation.mutateAsync({ roomId: room.id, status: RoomStatus.AVAILABLE });
-      }
-    }
-    await updateWorkflowStageMutation.mutateAsync({ bookingId, stage: WorkflowStage.CHECKED_OUT, checkInStatus: GuestCheckInStatus.CHECKED_OUT });
-  };
-
   const allocationBookings = bookings?.filter(b => b.status === BookingStatus.APPROVED) || [];
-  const allocatedBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.ALLOCATED) || [];
-  const checkedInBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.CHECKED_IN) || [];
-  const checkedOutBookings = bookings?.filter(b => b.currentWorkflowStage === WorkflowStage.CHECKED_IN && new Date(b.checkOutDate) <= new Date()) || [];
 
   return (
     <DashboardLayout
-      title="Booking Workflow Management"
-      description="Manage bookings through allocation, guest check-in, and check-out."
+      title="Room Allocation"
+      description="Manage and allocate rooms for approved bookings."
       role={UserRole.VFAST}
     >
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as WorkflowStage)} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value={WorkflowStage.ALLOCATION_PENDING}>Allocation</TabsTrigger>
-          <TabsTrigger value={WorkflowStage.ALLOCATED}>Guest Management & Check-in</TabsTrigger>
-          <TabsTrigger value={WorkflowStage.CHECKED_IN}>Stay Experience</TabsTrigger>
-          <TabsTrigger value={WorkflowStage.CHECKED_OUT}>Check-out</TabsTrigger>
-        </TabsList>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Allocations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isLoadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : stats?.pendingAllocations || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rooms Available Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isLoadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : stats?.roomsAvailableToday || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Upcoming Check-outs (24h)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isLoadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : stats?.upcomingCheckouts || 0}</div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Allocation Tab */}
-        <TabsContent value={WorkflowStage.ALLOCATION_PENDING} className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings Pending Allocation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading bookings...</span>
-                </div>
-              ) : allocationBookings.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No bookings currently pending allocation.</p>
-                </div>
-              ) : (
-                <BookingTable
-                  bookings={allocationBookings}
-                  renderActions={(booking) => (
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
-                      <Button size="sm" onClick={() => handleAllocateRoom(booking)}>Allocate</Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking.id)}>Reject</Button>
-                    </div>
-                  )}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Guest Management & Check-in Tab */}
-        <TabsContent value={WorkflowStage.ALLOCATED} className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Allocated Bookings - Guest Management & Check-in</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading bookings...</span>
-                </div>
-              ) : allocatedBookings.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No bookings currently allocated.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {allocatedBookings.map(booking => (
-                    <Card key={booking.id}>
-                      <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Booking #{booking.id} - {booking.purpose}</CardTitle>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => setSelectedBooking(booking)}>View Details</Button>
-                          <Button size="sm" onClick={() => handleMarkBookingCheckedIn(booking.id)}>Mark Checked In</Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <GuestManagementCard bookingId={booking.id} />
-                      </CardContent>
-                    </Card>
-                  ))}
+      <Card>
+        <CardHeader>
+          <CardTitle>Bookings Pending Allocation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading bookings...</span>
+            </div>
+          ) : allocationBookings.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No bookings currently pending allocation.</p>
+            </div>
+          ) : (
+            <AllocationTable
+              bookings={allocationBookings}
+              renderActions={(booking) => (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
+                  <Button size="sm" onClick={() => handleAllocateRoom(booking)}>Allocate</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking.id)}>Reject</Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            />
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Stay Experience Tab */}
-        <TabsContent value={WorkflowStage.CHECKED_IN} className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Checked-in Bookings - Stay Experience</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading bookings...</span>
-                </div>
-              ) : checkedInBookings.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No bookings currently checked in.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {checkedInBookings.map(booking => (
-                    <Card key={booking.id}>
-                      <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Booking #{booking.id} - {booking.purpose}</CardTitle>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => setSelectedBooking(booking)}>View Details</Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <GuestManagementCard bookingId={booking.id} />
-                        <GuestNotesSection bookingId={booking.id} />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Check-out Tab */}
-        <TabsContent value={WorkflowStage.CHECKED_OUT} className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings Ready for Check-out</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading bookings...</span>
-                </div>
-              ) : checkedOutBookings.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No bookings currently ready for check-out.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {checkedOutBookings.map(booking => (
-                    <Card key={booking.id}>
-                      <CardHeader className="flex flex-row justify-between items-center">
-                        <CardTitle>Booking #{booking.id} - {booking.purpose}</CardTitle>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => setSelectedBooking(booking)}>View Details</Button>
-                          <Button size="sm" onClick={() => handleMarkBookingCheckedOut(booking.id)}>Mark Checked Out</Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <GuestManagementCard bookingId={booking.id} />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Room Allocation Dialog */}
       {selectedBooking && (
         <Dialog open={isAllocationDialogOpen} onOpenChange={setIsAllocationDialogOpen}>
           <DialogContent className="sm:max-w-[600px]">

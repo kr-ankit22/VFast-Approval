@@ -2,42 +2,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Booking } from "@shared/schema";
 import { ReactNode } from "react";
+import { formatDistanceToNow } from "date-fns";
 
-type BookingTableProps = {
-  bookings: Booking[];
-  renderActions?: (booking: Booking) => ReactNode;
-  showRequestType?: boolean;
+type AllocationTableProps = {
+  bookings: any[];
+  renderActions?: (booking: any) => ReactNode;
 };
 
-export default function BookingTable({ bookings, renderActions, showRequestType }: BookingTableProps) {
+export default function AllocationTable({ bookings, renderActions }: AllocationTableProps) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>Ticket Age</TableHead>
+          <TableHead>Booking ID</TableHead>
           <TableHead>Purpose</TableHead>
+          <TableHead>Department</TableHead>
           <TableHead>Check-in</TableHead>
           <TableHead>Check-out</TableHead>
-          <TableHead>Status</TableHead>
-          {showRequestType && <TableHead>Request Type</TableHead>}
           {renderActions && <TableHead>Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {bookings.map((booking) => (
           <TableRow key={booking.id}>
+            <TableCell>{formatDistanceToNow(new Date(booking.departmentApprovalAt), { addSuffix: true })}</TableCell>
+            <TableCell>{booking.id}</TableCell>
             <TableCell>{booking.purpose}</TableCell>
+            <TableCell>{booking.departmentName}</TableCell>
             <TableCell>{new Date(booking.checkInDate).toLocaleDateString()}</TableCell>
             <TableCell>{new Date(booking.checkOutDate).toLocaleDateString()}</TableCell>
-            <TableCell>
-              <Badge>{booking.status}</Badge>
-            </TableCell>
-            {showRequestType && (
-              <TableCell>
-                <Badge variant={booking.isReconsidered ? "secondary" : "default"}>
-                  {booking.isReconsidered ? "Reconsidered" : "New"}
-                </Badge>
-              </TableCell>
-            )}
             {renderActions && <TableCell>{renderActions(booking)}</TableCell>}
           </TableRow>
         ))}

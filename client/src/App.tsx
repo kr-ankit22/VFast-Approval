@@ -32,7 +32,6 @@ import VFastAllBookingRequests from "@/pages/vfast/all-booking-requests";
 import VFastRoomInventory from "@/pages/vfast/room-inventory";
 import RoomAvailabilityPage from "@/pages/vfast/room-availability";
 import GuestWorklistPage from "@/pages/vfast/guest-worklist";
-import PendingAllocations from "@/pages/vfast/pending-allocations";
 
 import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
 
@@ -71,7 +70,6 @@ function Router() {
       <ProtectedRoute path="/vfast/room-inventory" component={VFastRoomInventory} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/room-availability" component={RoomAvailabilityPage} role={UserRole.VFAST} />
       <ProtectedRoute path="/vfast/guest-worklist" component={GuestWorklistPage} role={UserRole.VFAST} />
-      <ProtectedRoute path="/vfast/allocation" component={PendingAllocations} role={UserRole.VFAST} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
