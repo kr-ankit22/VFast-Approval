@@ -324,6 +324,12 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
             </TabsTrigger>
           </TabsList>
           <TabsContent value="guest-details">
+            <div className="flex justify-end mb-4">
+              <Button onClick={() => setIsAddGuestDialogOpen(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Guest
+              </Button>
+            </div>
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
