@@ -8,6 +8,7 @@ import { initializeStorage, IStorage } from "./storage";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import "./google-auth"; // Import the Google authentication strategy
+import "./auth"; // Import the local authentication strategy
 
 const PgStore = ConnectPgSimple(session);
 
