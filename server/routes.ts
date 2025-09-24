@@ -486,6 +486,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       }
       
       res.json(booking);
+    } catch (error) {
       console.error("Error updating booking status:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
