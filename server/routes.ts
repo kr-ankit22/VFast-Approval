@@ -1,8 +1,7 @@
 import type { Express, Request, Response } from "express";
 import passport from "passport";
 import { IStorage } from "./storage";
-import bcrypt from 'bcrypt';
-import { sendEmail } from './email';
+import { setupAuth } from "./auth";
 import { 
   insertBookingSchema, 
   departmentApprovalSchema, 
@@ -11,33 +10,14 @@ import {
     InsertGuest, GuestCheckInStatus, WorkflowStage,
   InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
-  BookingStatus,
-  users
+  BookingStatus
 } from "@shared/schema";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import fs from 'fs/promises';
 import Papa from 'papaparse';
 
 import upload from './upload';
-
-// Zod schemas for validation
-const loginSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
-
-const registerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.nativeEnum(UserRole),
-  phone: z.string().optional(),
-  department: z.string().optional(),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
 
 // Middleware to check user role
 const checkRole = (roles: UserRole[]) => {
@@ -74,84 +54,6 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.redirect("/");
     }
   );
-
-  // Local Register Route
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { name, email, password, role, phone, department } = registerSchema.parse(req.body);
-
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(409).json({ message: "User with this email already exists." });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const newUser = await storage.createUser({
-        name,
-        email,
-        password: hashedPassword,
-        role,
-        phone,
-        department_id: department ? parseInt(department) : undefined, // Assuming department is an ID
-      });
-
-      // Log the user in after successful registration
-      req.login(newUser, async (err) => {
-        if (err) {
-          console.error("Error logging in after registration:", err);
-          return res.status(500).json({ message: "Failed to log in after registration." });
-        }
-
-        // Send welcome email
-        try {
-          await sendEmail({
-            to: newUser.email,
-            subject: "Welcome to VFast Booker!",
-            html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
-            text: `Welcome, ${newUser.name}! Your account has been successfully created. You can now log in to the VFast Booker application.`,
-          });
-          console.log(`Welcome email sent to ${newUser.email}`);
-        } catch (emailError) {
-          console.error(`Failed to send welcome email to ${newUser.email}:`, emailError);
-          // Continue even if email fails, as user account is created
-        }
-
-        res.status(201).json(newUser);
-      });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const validationError = fromZodError(error);
-        return res.status(400).json({ message: validationError.message });
-      }
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Failed to register user." });
-    }
-  });
-
-  // Local Login Route
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) { return next(err); }
-      if (!user) { return res.status(401).json({ message: info.message }); }
-      req.login(user, (err) => {
-        if (err) { return next(err); }
-        return res.json(user);
-      });
-    })(req, res, next);
-  });
-
-  // Logout Route
-  app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
-      if (err) { return next(err); }
-      req.session.destroy((err) => {
-        if (err) { return next(err); }
-        res.clearCookie('connect.sid'); // Clear session cookie
-        res.status(200).json({ message: "Logged out successfully" });
-      });
-    });
-  });
 
   app.get("/api/users/me", (req, res) => {
     if (!req.isAuthenticated()) {
@@ -385,31 +287,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       }, req.user.role as UserRole);
 
       if (!booking) {
-        console.log(`[BACKEND] Booking ${bookingId} not found.`);
+        console.log(`[BACKEND] Booking ${bookingId} not found.`); // ADD THIS LINE
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      // Send email notification to the booking user
-      try {
-        const bookingUser = await storage.getUser(booking.userId);
-        if (bookingUser && bookingUser.email) {
-          await sendEmail({
-            to: bookingUser.email,
-            subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
-            html: `<h1>Booking Status Update</h1>
-                   <p>Dear ${bookingUser.name},</p>
-                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>
-                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}
-                   <p>Thank you for using VFast Booker.</p>`,
-            text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by the Department Approver. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
-          });
-          console.log(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
-        }
-      } catch (emailError) {
-        console.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
-      }
-
-      console.log(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
+      console.log(`[BACKEND] Booking ${bookingId} status updated to: ${status}`); // ADD THIS LINE
       res.json(booking);
     } catch (error) {
       console.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error); // ADD THIS LINE
@@ -464,28 +346,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
-
-      // Send email notification to the booking user
-      try {
-        const bookingUser = await storage.getUser(booking.userId);
-        if (bookingUser && bookingUser.email) {
-          await sendEmail({
-            to: bookingUser.email,
-            subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
-            html: `<h1>Booking Status Update</h1>
-                   <p>Dear ${bookingUser.name},</p>
-                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by an Administrator.</p>
-                   ${booking.notes ? `<p>Notes from administrator: ${booking.notes}</p>` : ''}
-                   <p>Thank you for using VFast Booker.</p>`,
-            text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by an Administrator. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
-          });
-          console.log(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
-        }
-      } catch (emailError) {
-        console.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
-      }
       
       res.json(booking);
+    } catch (error) {
       console.error("Error updating booking status:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
