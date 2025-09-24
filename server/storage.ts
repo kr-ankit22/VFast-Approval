@@ -20,6 +20,7 @@ import { eq, and, or, lt, gt, lte, gte, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
+import { sendEmail } from "./email";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -28,6 +29,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   
   // Booking operations
   getBooking(id: number): Promise<Booking | undefined>;
@@ -48,6 +50,7 @@ export interface IStorage {
   
   // Guest operations
   createGuest(guest: InsertGuest): Promise<Guest>;
+  getGuest(guestId: number): Promise<Guest | undefined>;
   getGuestsByBookingId(bookingId: number): Promise<Guest[]>;
   updateGuest(guestId: number, updates: Partial<Guest>): Promise<Guest | undefined>;
   deleteGuest(guestId: number): Promise<void>;
@@ -135,6 +138,20 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       // console.error("Error in createUser:", error);
       throw new Error("Failed to create user.");
+    }
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    try {
+      const [user] = await this.dbClient
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, id))
+        .returning();
+      return user;
+    } catch (error: any) {
+      console.error(`Error in updateUser for ID ${id}:`, error);
+      throw new Error("Failed to update user.");
     }
   }
 
@@ -406,6 +423,18 @@ export class DatabaseStorage implements IStorage {
         .set(updateSet)
         .where(eq(bookings.id, id))
         .returning();
+
+      // Send email notification
+      const user = await this.getUser(booking.userId);
+      if (user) {
+        await sendEmail({
+          to: user.email,
+          subject: `Booking status updated to ${booking.status}`,
+          text: `Your booking with ID ${booking.id} has been updated to ${booking.status}.`,
+          html: `<p>Your booking with ID ${booking.id} has been updated to ${booking.status}.</p>`,
+        });
+      }
+
       return booking;
     } catch (error: any) {
       console.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
@@ -708,9 +737,40 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getGuest(guestId: number): Promise<Guest | undefined> {
+    try {
+      const [guest] = await this.dbClient.select().from(guests).where(eq(guests.id, guestId));
+      return guest;
+    } catch (error: any) {
+      console.error(`Error in getGuest for ID ${guestId}:`, error);
+      throw new Error("Failed to retrieve guest.");
+    }
+  }
+
   async getGuestsByBookingId(bookingId: number): Promise<Guest[]> {
     try {
-      return await this.dbClient.select().from(guests).where(eq(guests.bookingId, bookingId));
+      return await this.dbClient.select({
+        id: guests.id,
+        bookingId: guests.bookingId,
+        name: guests.name,
+        contact: guests.contact,
+        kycDocumentUrl: guests.kycDocumentUrl,
+        isVerified: guests.isVerified,
+        checkedIn: guests.checkedIn,
+        checkInTime: guests.checkInTime,
+        checkOutTime: guests.checkOutTime,
+        origin: guests.origin,
+        spocName: guests.spocName,
+        spocContact: guests.spocContact,
+        foodPreferences: guests.foodPreferences,
+        otherSpecialRequests: guests.otherSpecialRequests,
+        keyHandedOver: guests.keyHandedOver,
+        citizenCategory: guests.citizenCategory,
+        travelDetails: guests.travelDetails,
+        passportNumber: guests.passportNumber,
+        nationality: guests.nationality,
+        otherNationality: guests.otherNationality,
+      }).from(guests).where(eq(guests.bookingId, bookingId));
     } catch (error: any) {
       console.error(`Error in getGuestsByBookingId for booking ID ${bookingId}:`, error);
       throw new Error("Failed to retrieve guests for booking.");

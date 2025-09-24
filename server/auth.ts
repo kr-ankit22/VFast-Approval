@@ -41,30 +41,25 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "vfasthostelbooking-secret",
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-  };
-
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
-
   passport.use(
     new LocalStrategy(
       { usernameField: "email" },
       async (email, password, done) => {
+        console.log(`Attempting to authenticate user: ${email}`);
         try {
           const user = await storage.getUserByEmail(email);
-          if (!user || !(await comparePasswords(password, user.password))) {
+          console.log('User from DB:', user);
+          if (!user) {
+            console.log('Authentication failed: User not found.');
             return done(null, false, { message: "Invalid email or password" });
           }
+          const isPasswordValid = await comparePasswords(password, user.password);
+          console.log('Is password valid:', isPasswordValid);
+          if (!isPasswordValid) {
+            console.log('Authentication failed: Invalid password.');
+            return done(null, false, { message: "Invalid email or password" });
+          }
+          console.log('Authentication successful for user:', user.email);
           return done(null, user);
         } catch (error) {
           return done(error);

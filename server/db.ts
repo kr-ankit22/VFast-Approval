@@ -11,7 +11,7 @@ if (!process.env.DATABASE_URL) {
 
 console.log("DATABASE_URL:", process.env.DATABASE_URL);
 // Create a connection pool
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: true });
 console.log("Database pool created.");
 
 // Create a drizzle instance with our schema

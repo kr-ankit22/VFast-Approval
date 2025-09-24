@@ -23,6 +23,7 @@ import DepartmentBookingRequests from "@/pages/department-approver/booking-reque
 import AdminDashboard from "@/pages/admin/dashboard";
 import BookingRequests from "@/pages/admin/booking-requests";
 import RoomManagement from "@/pages/admin/room-management";
+import UserProvisioningPage from "@/pages/admin/user-provisioning";
 
 // VFast Pages
 import VFastDashboard from "@/pages/vfast/dashboard";
@@ -37,12 +38,18 @@ import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
 
 import ReconsiderWorklist from "@/pages/booking-user/reconsider-worklist";
 
+import ProfilePage from "@/pages/profile-page";
+
 function Router() {
   return (
     <Switch>
       {/* Public Routes */}
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
+      <ProtectedRoute path="/profile" component={ProfilePage} role={UserRole.BOOKING} />
+      <ProtectedRoute path="/profile" component={ProfilePage} role={UserRole.DEPARTMENT_APPROVER} />
+      <ProtectedRoute path="/profile" component={ProfilePage} role={UserRole.ADMIN} />
+      <ProtectedRoute path="/profile" component={ProfilePage} role={UserRole.VFAST} />
       
       {/* Booking User Routes */}
       <ProtectedRoute path="/booking" component={BookingUserDashboard} role={UserRole.BOOKING} />
@@ -60,6 +67,7 @@ function Router() {
       <ProtectedRoute path="/admin" component={AdminDashboard} role={UserRole.ADMIN} />
       <ProtectedRoute path="/admin/requests" component={BookingRequests} role={UserRole.ADMIN} />
       <ProtectedRoute path="/admin/rooms" component={RoomManagement} role={UserRole.ADMIN} />
+      <ProtectedRoute path="/admin/user-provisioning" component={UserProvisioningPage} role={UserRole.ADMIN} />
       
       {/* VFast Routes */}
       <ProtectedRoute path="/vfast" component={VFastDashboard} role={UserRole.VFAST} />

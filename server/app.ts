@@ -1,9 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import passport from "passport";
+import ConnectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { db, pool } from "./db";
 import { initializeStorage, IStorage } from "./storage";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
+import "./google-auth"; // Import the Google authentication strategy
+
+const PgStore = ConnectPgSimple(session);
 
 export async function createApp(): Promise<{ app: express.Express, storage: IStorage }> {
   const app = express();
@@ -11,31 +17,21 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
   app.use(express.urlencoded({ extended: false }));
   app.use('/uploads', express.static('uploads'));
 
-  // Custom logging middleware
-  // app.use((req, res, next) => {
-  //   const start = Date.now();
-  //   const path = req.path;
-  //   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  app.use(
+    session({
+      store: new PgStore({
+        pool: pool,
+        tableName: "user_sessions",
+      }),
+      secret: process.env.SESSION_SECRET || "a-secret-key-for-sessions",
+      resave: false,
+      saveUninitialized: false,
+      cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+    })
+  );
 
-  //   const originalResJson = res.json;
-  //   res.json = function (bodyJson, ...args) {
-  //     capturedJsonResponse = bodyJson;
-  //     return originalResJson.apply(res, [bodyJson, ...args]);
-  //   };
-
-  //   res.on("finish", () => {
-  //     const duration = Date.now() - start;
-  //     if (path.startsWith("/api")) {
-  //       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-  //       if (capturedJsonResponse) {
-  //         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-  //       }
-  //       log(logLine);
-  //     }
-  //   });
-
-  //   next();
-  // });
+  app.use(passport.initialize());
+  app.use(passport.session());
 
   try {
     await db.execute(sql`SELECT 1`);

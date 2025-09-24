@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { pool } from '../server/db';
 import * as fs from 'fs/promises';
 import * as path from 'path';

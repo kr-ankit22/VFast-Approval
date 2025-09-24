@@ -68,7 +68,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default(UserRole.BOOKING),
-  phone: text("phone"),
+  googleId: text("google_id").unique(),
+  mobileNumber: text("mobile_number"),
   department_id: integer("department_id").references(() => departments.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -209,8 +210,12 @@ export const guests = pgTable("guests", {
   spocContact: text("spoc_contact"),
   foodPreferences: text("food_preferences"),
   otherSpecialRequests: text("other_special_requests"),
+  keyHandedOver: boolean("key_handed_over").default(false),
   travelDetails: json("travel_details"),
   citizenCategory: text("citizen_category"),
+  passportNumber: text("passport_number"),
+  nationality: text("nationality"),
+  otherNationality: text("other_nationality"),
 });
 
 export const roomMaintenance = pgTable("room_maintenance", {

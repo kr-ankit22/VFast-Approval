@@ -45,7 +45,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/booking/create", icon: <PlusCircle size={18} />, label: "New Booking" },
           { href: "/booking/history", icon: <History size={18} />, label: "Booking History" },
           { href: "/booking/reconsider", icon: <RefreshCw size={18} />, label: "Reconsideration" },
-          { href: "/profile", icon: <UserCog size={18} />, label: "Profile Settings" }
+          { href: "/profile", icon: <UserCog size={18} />, label: "Settings" }
         ];
       case UserRole.ADMIN:
         return [
@@ -53,13 +53,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/admin/requests", icon: <ClipboardList size={18} />, label: "Booking Requests" },
           { href: "/admin/rooms", icon: <Hotel size={18} />, label: "Room Management" },
           { href: "/admin/reports", icon: <ChartBar size={18} />, label: "Reports" },
-          { href: "/admin/settings", icon: <Settings size={18} />, label: "Settings" }
+          { href: "/admin/user-provisioning", icon: <UserCog size={18} />, label: "User Provisioning" },
+          { href: "/profile", icon: <Settings size={18} />, label: "Settings" }
         ];
       case UserRole.DEPARTMENT_APPROVER:
         return [
           { href: "/department", icon: <Home size={18} />, label: "Dashboard" },
           { href: "/department/requests", icon: <ClipboardList size={18} />, label: "Booking Requests" },
-          { href: "/profile", icon: <UserCog size={18} />, label: "Profile Settings" }
+          { href: "/profile", icon: <UserCog size={18} />, label: "Settings" }
         ];
       case UserRole.VFAST:
         return [
@@ -70,7 +71,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: "/vfast/reconsideration", icon: <RefreshCw size={18} />, label: "Reconsideration Requests" },
           { href: "/vfast/all-booking-requests", icon: <ClipboardList size={18} />, label: "All Booking Requests" },
           
-          { href: "/vfast/settings", icon: <Settings size={18} />, label: "Settings" }
+          { href: "/profile", icon: <Settings size={18} />, label: "Settings" }
         ];
       default:
         return [];

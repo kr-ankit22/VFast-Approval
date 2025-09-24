@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import passport from "passport";
 import { IStorage } from "./storage";
 import { setupAuth } from "./auth";
 import { 
@@ -14,6 +15,7 @@ import {
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import fs from 'fs/promises';
+import Papa from 'papaparse';
 
 import upload from './upload';
 
@@ -41,6 +43,79 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Set up authentication routes
   setupAuth(app, storage);
+
+  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/login" }),
+    (req, res) => {
+      // Successful authentication, redirect home.
+      res.redirect("/");
+    }
+  );
+
+  app.get("/api/users/me", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    res.json(req.user);
+  });
+
+  app.patch("/api/users/me", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const { mobileNumber } = req.body;
+    const userId = req.user.id;
+
+    try {
+      const updatedUser = await storage.updateUser(userId, { mobileNumber });
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.post("/api/admin/users/upload", checkRole([UserRole.ADMIN]), upload.single('file'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const csvData = req.file.buffer.toString('utf-8');
+    let created = 0;
+    let updated = 0;
+
+    Papa.parse(csvData, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        for (const row of results.data as any[]) {
+          const { email, role } = row;
+
+          if (!email || !role) {
+            continue;
+          }
+
+          const existingUser = await storage.getUserByEmail(email);
+
+          if (existingUser) {
+            await storage.updateUser(existingUser.id, { role });
+            updated++;
+          } else {
+            await storage.createUser({ name: email.split('@')[0], email, password: 'password', role });
+            created++;
+          }
+        }
+
+        res.json({ created, updated });
+      },
+      error: (error) => {
+        res.status(500).json({ message: "Failed to parse CSV file", error });
+      },
+    });
+  });
 
   // Get guest worklist (VFast users)
   app.get("/api/bookings/worklist", checkRole([UserRole.VFAST]), async (req, res) => {
@@ -331,9 +406,21 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Add a guest to a booking
   app.post("/api/bookings/:bookingId/guests", checkRole([UserRole.VFAST]), async (req, res) => {
+    console.log('GUEST BODY', req.body)
     try {
       const bookingId = parseInt(req.params.bookingId);
-      const { name, contact, kycDocumentUrl } = req.body;
+      const {
+        name,
+        contact,
+        kycDocumentUrl,
+        origin,
+        spocName,
+        spocContact,
+        foodPreferences,
+        otherSpecialRequests,
+        travelDetails,
+        citizenCategory,
+      } = req.body;
 
       const booking = await storage.getBooking(bookingId);
       if (!booking) {
@@ -345,6 +432,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         name,
         contact,
         kycDocumentUrl,
+        origin,
+        spocName,
+        spocContact,
+        foodPreferences,
+        otherSpecialRequests,
+        travelDetails,
+        citizenCategory,
       };
 
       const guest = await storage.createGuest(guestData);
@@ -395,6 +489,50 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.status(204).send(); // No content
     } catch (error) {
       res.status(500).json({ message: "Failed to delete guest" });
+    }
+  });
+
+  // Upload document for a guest
+  app.post("/api/guests/:guestId/document", checkRole([UserRole.VFAST]), upload.single('file'), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const guest = await storage.updateGuest(guestId, { kycDocumentUrl: file.path });
+
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Delete document for a guest
+  app.delete("/api/guests/:guestId/document", checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const guestId = parseInt(req.params.guestId);
+      const guest = await storage.getGuest(guestId);
+
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+
+      if (guest.kycDocumentUrl) {
+        await fs.unlink(guest.kycDocumentUrl);
+      }
+
+      const updatedGuest = await storage.updateGuest(guestId, { kycDocumentUrl: null });
+
+      res.json(updatedGuest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete document" });
     }
   });
 

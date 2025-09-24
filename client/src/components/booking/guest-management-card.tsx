@@ -1,31 +1,27 @@
-import { useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, UserPlus, CheckCircle, XCircle, Upload, UserCheck, UserX, Edit, HelpCircle } from "lucide-react";
+import { Loader2, UserPlus, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Guest, InsertGuest, Booking, User, Department } from "@shared/schema";
+import { Guest, InsertGuest, Booking, Department } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import CheckOutButton from "./check-out-button";
-import DocumentUpload from "./document-upload";
 import { Switch } from "@/components/ui/switch";
 import CheckInDialog from "./check-in-dialog";
-import SectionHeader from "@/components/ui/section-header";
 import GuestNotesSection from "./guest-notes-section";
+import BookingDocument from "./booking-document";
+import GuestDataTable from "./guest-data-table";
 
 interface GuestManagementCardProps {
   bookingId: number;
@@ -34,30 +30,13 @@ interface GuestManagementCardProps {
 const guestFormSchema = z.object({
   name: z.string().min(2, "Guest name must be at least 2 characters."),
   contact: z.string().min(1, "Contact is required."),
-  kycDocumentUrl: z.string().min(1, "KYC document is required."),
+  kycDocumentUrl: z.string().optional(),
   origin: z.string().min(1, "Origin is required."),
   spocName: z.string().min(1, "SPOC name is required."),
   spocContact: z.string().min(1, "SPOC contact is required."),
   foodPreferences: z.string().optional(),
   otherSpecialRequests: z.string().optional(),
-  keyHandedOver: z.boolean(),
-  citizenCategory: z.enum(["Indian", "NRI", "Foreign National"]),
-  travelDetails: z.string().optional(),
-  passportNumber: z.string().optional(),
-  nationality: z.string().optional(),
-  otherNationality: z.string().optional(),
-});
-
-const editGuestFormSchema = z.object({
-  name: z.string().min(2, "Guest name must be at least 2 characters."),
-  contact: z.string().min(1, "Contact is required."),
-  kycDocumentUrl: z.string().min(1, "KYC document is required."),
-  origin: z.string().min(1, "Origin is required."),
-  spocName: z.string().min(1, "SPOC name is required."),
-  spocContact: z.string().min(1, "SPOC contact is required."),
-  foodPreferences: z.string().optional(),
-  otherSpecialRequests: z.string().optional(),
-  keyHandedOver: z.boolean(),
+  keyHandedOver: z.boolean().optional(),
   citizenCategory: z.enum(["Indian", "NRI", "Foreign National"]),
   travelDetails: z.string().optional(),
   passportNumber: z.string().optional(),
@@ -71,21 +50,12 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
   const [isAddGuestDialogOpen, setIsAddGuestDialogOpen] = useState(false);
   const [isEditGuestDialogOpen, setIsEditGuestDialogOpen] = useState(false);
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
+  const [editGuestData, setEditGuestData] = useState<Partial<Guest>>({});
   const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
   const [guestToCheckIn, setGuestToCheckIn] = useState<Guest | null>(null);
 
-  const { data: booking } = useQuery<Booking>({
+  const { data: booking } = useQuery<Booking & { department?: Department }>({
     queryKey: [`/api/bookings/${bookingId}`],
-  });
-
-  const { data: department } = useQuery<Department>({
-    queryKey: [`/api/departments/${booking?.department_id}`],
-    enabled: !!booking?.department_id,
-  });
-
-  const { data: departmentApprover } = useQuery<User>({
-    queryKey: [`/api/users/${booking?.departmentApproverId}`],
-    enabled: !!booking?.departmentApproverId,
   });
 
   const { data: guests, isLoading, isError } = useQuery<Guest[]>({
@@ -95,12 +65,12 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
 
   const addGuestForm = useForm<z.infer<typeof guestFormSchema>>({
     resolver: zodResolver(guestFormSchema.refine(data => {
-      if (data.citizenCategory === 'Foreign National') {
+      if (data.citizenCategory === 'Foreign National' || data.citizenCategory === 'NRI') {
         return !!data.passportNumber && !!data.nationality;
       }
       return true;
     }, {
-      message: "Passport number and nationality are required for foreign nationals.",
+      message: "Passport number and nationality are required for foreign nationals and NRIs.",
       path: ["passportNumber"],
     })),
     defaultValues: {
@@ -112,23 +82,6 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
       spocContact: "",
       foodPreferences: "",
       otherSpecialRequests: "",
-      citizenCategory: undefined,
-      travelDetails: "",
-    },
-  });
-
-  const editGuestForm = useForm<z.infer<typeof editGuestFormSchema>>({
-    resolver: zodResolver(editGuestFormSchema),
-    defaultValues: {
-      name: "",
-      contact: "",
-      kycDocumentUrl: "",
-      origin: "",
-      spocName: "",
-      spocContact: "",
-      foodPreferences: "",
-      otherSpecialRequests: "",
-      keyHandedOver: false,
       citizenCategory: undefined,
       travelDetails: "",
     },
@@ -180,6 +133,7 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
       setGuestToEdit(null);
     },
     onError: (error: Error) => {
+      console.error("Failed to update guest:", error);
       toast({
         title: "Failed to update guest",
         description: error.message,
@@ -241,6 +195,32 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
     },
   });
 
+  const checkOutGuestMutation = useMutation({
+    mutationFn: async (guestId: number) => {
+      const res = await apiRequest("POST", `/api/guests/${guestId}/check-out`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to check-out guest");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}/guests`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+      toast({
+        title: "Guest Checked-out",
+        description: "Guest has been successfully checked-out.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to check-out guest",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const checkOutAllMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/bookings/${bookingId}/checkout-all`);
@@ -273,13 +253,19 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
 
   const handleEditGuest = (guest: Guest) => {
     setGuestToEdit(guest);
-    editGuestForm.reset(guest);
+    setEditGuestData(guest);
     setIsEditGuestDialogOpen(true);
   };
 
-  const handleUpdateGuest = (values: z.infer<typeof guestFormSchema>) => {
+  const handleUpdateGuest = () => {
     if (guestToEdit) {
-      updateGuestMutation.mutate({ guestId: guestToEdit.id, updates: values });
+      const updates: Partial<Guest> = {};
+      for (const key in editGuestData) {
+        if (editGuestData[key as keyof Guest] !== guestToEdit[key as keyof Guest]) {
+          updates[key as keyof Guest] = editGuestData[key as keyof Guest];
+        }
+      }
+      updateGuestMutation.mutate({ guestId: guestToEdit.id, updates });
     }
   };
 
@@ -324,91 +310,40 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
             </TabsTrigger>
           </TabsList>
           <TabsContent value="guest-details">
-            <div className="flex justify-end mb-4">
-              <Button onClick={() => setIsAddGuestDialogOpen(true)}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Guest
-              </Button>
+            <div className="space-y-4">
+              <BookingDocument bookingId={bookingId} documentPath={booking?.documentPath} />
+              <div className="flex justify-end">
+                <Button onClick={() => setIsAddGuestDialogOpen(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Guest
+                </Button>
+              </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2">Loading guests...</span>
+                </div>
+              ) : isError ? (
+                <div className="text-center py-8 text-red-500">
+                  <XCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>Failed to load guests.</p>
+                </div>
+              ) : (
+                <GuestDataTable
+                  guests={guests || []}
+                  departmentName={booking?.department?.name || ''}
+                  onEdit={handleEditGuest}
+                  onCheckIn={(guest) => {
+                    setGuestToCheckIn(guest);
+                    setIsCheckInDialogOpen(true);
+                  }}
+                  onCheckOut={(guest) => checkOutGuestMutation.mutate(guest.id)}
+                />
+              )}
             </div>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2">Loading guests...</span>
-              </div>
-            ) : isError ? (
-              <div className="text-center py-8 text-red-500">
-                <XCircle className="h-8 w-8 mx-auto mb-2" />
-                <p>Failed to load guests.</p>
-              </div>
-            ) : guests.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No guests added for this booking yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {guests.map((guest) => (
-                  <Collapsible key={guest.id} className={`border rounded-lg overflow-hidden ${guest.checkedIn ? 'bg-green-50' : ''}`}>
-                    <CollapsibleTrigger className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <Avatar>
-                          <AvatarImage src={`https://api.dicebear.com/6.x/initials/svg?seed=${guest.name}`} />
-                          <AvatarFallback>{guest.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-grow text-right"> {/* Added flex-grow and text-right */}
-                          <h4 className="font-semibold text-lg">{guest.name}</h4> {/* Removed text-right from h4 */}
-                          <div className="flex items-center space-x-2 justify-end"> {/* Added justify-end */}
-                            <Badge variant={guest.citizenCategory === 'Indian' ? 'default' : 'secondary'}>{guest.citizenCategory}</Badge>
-                            {department && <Badge variant="outline">{department.name}</Badge>}
-                            {departmentApprover && <Badge variant="outline">Approver: {departmentApprover.name}</Badge>}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {!guest.checkedIn ? (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGuestToCheckIn(guest);
-                              setIsCheckInDialogOpen(true);
-                            }}
-                            disabled={!booking?.documentPath || !guest.name}
-                          >
-                            Check-in
-                          </Button>
-                        ) : (
-                          <CheckOutButton guestId={guest.id} bookingId={bookingId} />
-                        )}
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditGuest(guest); }}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="p-4 pt-0">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                        <div>
-                          <p className="text-sm text-gray-600"><strong>Contact:</strong> {guest.contact || 'N/A'}</p>
-                          <p className="text-sm text-gray-600"><strong>Origin:</strong> {guest.origin || 'N/A'}</p>
-                          <p className="text-sm text-gray-600"><strong>SPOC:</strong> {guest.spocName || 'N/A'} ({guest.spocContact || 'N/A'})</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600"><strong>Food Prefs:</strong> {guest.foodPreferences || 'N/A'}</p>
-                          <p className="text-sm text-gray-600"><strong>Other Requests:</strong> {guest.otherSpecialRequests || 'N/A'}</p>
-                          <p className="text-sm text-gray-600"><strong>Travel Details:</strong> {guest.travelDetails ? JSON.stringify(guest.travelDetails) : 'N/A'}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <h5 className="text-sm font-medium">KYC Document</h5>
-                        <DocumentUpload bookingId={bookingId} />
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
-              </div>
-            )}
           </TabsContent>
           <TabsContent value="stay-experience">
-            <div className="flex flex-col space-y-4 p-4"> {/* Changed to flex-col to stack elements */}
+            <div className="flex flex-col space-y-4 p-4">
               <div className="flex items-center space-x-2">
                 <Label htmlFor="key-handed-over">Key Handed Over</Label>
                 <Switch
@@ -419,7 +354,7 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
                   }}
                 />
               </div>
-              <GuestNotesSection bookingId={bookingId} /> {/* Added GuestNotesSection */}
+              <GuestNotesSection bookingId={bookingId} />
             </div>
           </TabsContent>
           <TabsContent value="checkout-operations">
@@ -500,7 +435,7 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
                 )}
               />
 
-              {addGuestForm.watch("citizenCategory") === "Foreign National" && (
+              {["Foreign National", "NRI"].includes(addGuestForm.watch("citizenCategory")) && (
                 <>
                   <FormField
                     control={addGuestForm.control}
@@ -528,7 +463,6 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {/* Add a list of countries here */}
                             <SelectItem value="USA">United States</SelectItem>
                             <SelectItem value="UK">United Kingdom</SelectItem>
                             <SelectItem value="Canada">Canada</SelectItem>
@@ -652,215 +586,89 @@ export default function GuestManagementCard({ bookingId }: GuestManagementCardPr
       </Dialog>
 
       {/* Edit Guest Dialog */}
-      <Dialog open={isEditGuestDialogOpen} onOpenChange={setIsEditGuestDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Guest: {guestToEdit?.name}</DialogTitle>
-            <DialogDescription>
-              Update details for this guest.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...editGuestForm}>
-            <form onSubmit={editGuestForm.handleSubmit(handleUpdateGuest)} className="space-y-4">
-              <FormField
-                control={editGuestForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Guest Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter guest name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="contact"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter contact details" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="citizenCategory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Citizen Category *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Indian">Indian</SelectItem>
-                        <SelectItem value="NRI">NRI</SelectItem>
-                        <SelectItem value="Foreign National">Foreign National</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      {guestToEdit && (
+        <Dialog open={isEditGuestDialogOpen} onOpenChange={setIsEditGuestDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Guest: {guestToEdit.name}</DialogTitle>
+              <DialogDescription>
+                Update details for this guest.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Guest Name *</Label>
+                  <Input id="name" value={editGuestData.name || ''} onChange={(e) => setEditGuestData({ ...editGuestData, name: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact">Contact *</Label>
+                  <Input id="contact" value={editGuestData.contact || ''} onChange={(e) => setEditGuestData({ ...editGuestData, contact: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Citizen Category *</Label>
+                <Select value={editGuestData.citizenCategory || undefined} onValueChange={(value) => setEditGuestData({ ...editGuestData, citizenCategory: value as any })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Indian">Indian</SelectItem>
+                    <SelectItem value="NRI">NRI</SelectItem>
+                    <SelectItem value="Foreign National">Foreign National</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              {editGuestForm.watch("citizenCategory") === "Foreign National" && (
-                <>
-                  <FormField
-                    control={editGuestForm.control}
-                    name="passportNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Passport Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter passport number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editGuestForm.control}
-                    name="nationality"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nationality</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select nationality" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {/* Add a list of countries here */}
-                            <SelectItem value="USA">United States</SelectItem>
-                            <SelectItem value="UK">United Kingdom</SelectItem>
-                            <SelectItem value="Canada">Canada</SelectItem>
-                            <SelectItem value="Australia">Australia</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {editGuestForm.watch("nationality") === "Other" && (
-                    <FormField
-                      control={editGuestForm.control}
-                      name="otherNationality"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Please specify nationality</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Country" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </>
+              {(editGuestData.citizenCategory === "Foreign National" || editGuestData.citizenCategory === "NRI") && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="passportNumber">Passport Number</Label>
+                    <Input id="passportNumber" value={editGuestData.passportNumber || ''} onChange={(e) => setEditGuestData({ ...editGuestData, passportNumber: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nationality">Nationality</Label>
+                    <Input id="nationality" value={editGuestData.nationality || ''} onChange={(e) => setEditGuestData({ ...editGuestData, nationality: e.target.value })} />
+                  </div>
+                </div>
               )}
 
-              <FormField
-                control={editGuestForm.control}
-                name="origin"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Origin (City/Country) *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter origin (City/Country)" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="spocName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SPOC Name (On Campus) *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter SPOC name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="spocContact"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SPOC Contact *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter SPOC contact" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="foodPreferences"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Food Preferences/Dietary Needs</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., Vegetarian, Gluten-free, No nuts" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="otherSpecialRequests"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Other Special Requests</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., Wheelchair access, extra pillow" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editGuestForm.control}
-                name="travelDetails"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Travel Details (Notes)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="e.g., Arriving by flight AI123 at 10 AM on Jan 1st."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>General notes about guest's travel arrangements.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditGuestDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={updateGuestMutation.isPending}>
-                  {updateGuestMutation.isPending ? "Updating..." : "Update Guest"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+              <div className="space-y-2">
+                <Label htmlFor="origin">Origin (City/Country) *</Label>
+                <Input id="origin" value={editGuestData.origin || ''} onChange={(e) => setEditGuestData({ ...editGuestData, origin: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="spocName">SPOC Name (On Campus) *</Label>
+                  <Input id="spocName" value={editGuestData.spocName || ''} onChange={(e) => setEditGuestData({ ...editGuestData, spocName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="spocContact">SPOC Contact *</Label>
+                  <Input id="spocContact" value={editGuestData.spocContact || ''} onChange={(e) => setEditGuestData({ ...editGuestData, spocContact: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="foodPreferences">Food Preferences/Dietary Needs</Label>
+                <Textarea id="foodPreferences" value={editGuestData.foodPreferences || ''} onChange={(e) => setEditGuestData({ ...editGuestData, foodPreferences: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="otherSpecialRequests">Other Special Requests</Label>
+                <Textarea id="otherSpecialRequests" value={editGuestData.otherSpecialRequests || ''} onChange={(e) => setEditGuestData({ ...editGuestData, otherSpecialRequests: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="travelDetails">Travel Details (Notes)</Label>
+                <Textarea id="travelDetails" value={editGuestData.travelDetails || ''} onChange={(e) => setEditGuestData({ ...editGuestData, travelDetails: e.target.value as any})} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditGuestDialogOpen(false)}>Cancel</Button>
+              <Button type="button" disabled={updateGuestMutation.isPending} onClick={handleUpdateGuest}>
+                {updateGuestMutation.isPending ? "Updating..." : "Update Guest"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <CheckInDialog
         open={isCheckInDialogOpen}
