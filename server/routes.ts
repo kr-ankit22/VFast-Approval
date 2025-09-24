@@ -62,7 +62,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Set up authentication routes
-  setupAuth(app, storage);
+
 
   app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
