@@ -92,6 +92,11 @@ export default function DashboardLayout({
         href: "/admin/rooms",
         icon: Hotel,
       },
+      {
+        name: "User Provisioning",
+        href: "/admin/user-provisioning",
+        icon: Users,
+      },
     ],
     [UserRole.DEPARTMENT_APPROVER]: [
       {
