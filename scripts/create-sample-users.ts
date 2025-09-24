@@ -1,14 +1,9 @@
-import { scrypt, randomBytes } from "crypto";
-import { promisify } from "util";
+import bcrypt from 'bcrypt';
 import { db } from "../server/db";
 import { users, UserRole } from "../shared/schema";
 
-const scryptAsync = promisify(scrypt);
-
 async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  return bcrypt.hash(password, 10);
 }
 
 async function createSampleUsers() {
