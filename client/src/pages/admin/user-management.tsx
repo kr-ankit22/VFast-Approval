@@ -77,7 +77,7 @@ export default function UserManagementPage() {
     queryKey: ["adminUsers"], 
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/users");
-      return res.data;
+      return res.json();
     }
   });
 
