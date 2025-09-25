@@ -30,6 +30,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   
   // Booking operations
   getBooking(id: number): Promise<Booking | undefined>;
@@ -152,6 +153,15 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       console.error(`Error in updateUser for ID ${id}:`, error);
       throw new Error("Failed to update user.");
+    }
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    try {
+      return await this.dbClient.select().from(users);
+    } catch (error: any) {
+      console.error("Error in getAllUsers:", error);
+      throw new Error("Failed to retrieve all users.");
     }
   }
 
