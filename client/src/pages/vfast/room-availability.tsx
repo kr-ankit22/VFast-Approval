@@ -46,16 +46,12 @@ export default function RoomAvailabilityPage() {
   }));
 
   return (
-    <DashboardLayout
-      title="Room Availability"
-      description="View the availability of all rooms"
-      role={UserRole.VFAST}
-    >
+    <>
       <Card>
         <CardHeader>
           <CardTitle>Room Availability Calendar</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoadingRooms || isLoadingBookings ? (
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           ) : (
@@ -75,6 +71,6 @@ export default function RoomAvailabilityPage() {
           )}
         </CardContent>
       </Card>
-    </DashboardLayout>
+    </>
   );
 }

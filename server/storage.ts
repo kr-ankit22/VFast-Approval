@@ -16,7 +16,7 @@ import {
   roomMaintenance,
   guestNotes
 } from "@shared/schema";
-import { eq, and, or, lt, gt, lte, gte, sql } from "drizzle-orm";
+import { eq, and, or, lt, gt, lte, gte, sql, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
@@ -84,6 +84,8 @@ export interface IStorage {
   // Department operations
   getAllDepartments(): Promise<Department[]>;
   getDepartment(id: number): Promise<Department | undefined>;
+  getTotalUsers(): Promise<number>;
+  getTotalDepartments(): Promise<number>;
 
   // Stats
   getVFastAllocationStats(): Promise<any>;
@@ -437,7 +439,7 @@ export class DatabaseStorage implements IStorage {
       // Send email notification
       const user = await this.getUser(booking.userId);
       if (user) {
-        await sendEmail({
+        sendEmail({
           to: user.email,
           subject: `Booking status updated to ${booking.status}`,
           text: `Your booking with ID ${booking.id} has been updated to ${booking.status}.`,
@@ -491,84 +493,99 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getBookingJourney(bookingId: number): Promise<any> {
-    try {
-      const booking = await this.getBooking(bookingId);
-      if (!booking) {
-        return null;
-      }
-
-      const journey: any[] = [];
-
-      // Booking Creation
-      const creator = await this.getUser(booking.userId);
-      journey.push({
-        stage: "Booking Creation",
-        status: "Submitted",
-        actor: creator ? { id: creator.id, name: creator.name } : null,
-        timestamp: booking.createdAt,
-        notes: null,
-      });
-
-      // Department Approval
-      if (booking.departmentApproverId) {
-        const approver = await this.getUser(booking.departmentApproverId);
+    async getBookingJourney(bookingId: number): Promise<any> {
+      try {
+        const booking = await this.getBooking(bookingId);
+        if (!booking) {
+          return null;
+        }
+  
+        const userIdsToFetch: Set<number> = new Set();
+        userIdsToFetch.add(booking.userId);
+        if (booking.departmentApproverId) userIdsToFetch.add(booking.departmentApproverId);
+        if (booking.adminApproverId) userIdsToFetch.add(booking.adminApproverId);
+        if (booking.rejectionHistory) {
+          for (const rejection of booking.rejectionHistory as any[]) {
+            if (rejection.rejectedBy) userIdsToFetch.add(rejection.rejectedBy);
+          }
+        }
+  
+        const usersMap = new Map<number, User>();
+        if (userIdsToFetch.size > 0) {
+          const fetchedUsers = await this.dbClient.select().from(users).where(inArray(users.id, Array.from(userIdsToFetch)));
+          fetchedUsers.forEach(user => usersMap.set(user.id, user));
+        }
+  
+        const journey: any[] = [];
+  
+        // Booking Creation
+        const creator = usersMap.get(booking.userId);
         journey.push({
-          stage: "Department Approval",
-          status: booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
-          actor: approver ? { id: approver.id, name: approver.name } : null,
-          timestamp: booking.departmentApprovalAt,
-          notes: booking.departmentNotes, // Populate with departmentNotes
+          stage: "Booking Creation",
+          status: "Submitted",
+          actor: creator ? { id: creator.id, name: creator.name } : null,
+          timestamp: booking.createdAt,
+          notes: null,
         });
-      }
-
-      // Admin Approval
-      if (booking.adminApproverId) {
-        const approver = await this.getUser(booking.adminApproverId);
-        journey.push({
-          stage: "Admin Approval",
-          status: booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
-          actor: approver ? { id: approver.id, name: approver.name } : null,
-          timestamp: booking.adminApprovalAt,
-          notes: booking.adminNotes,
-        });
-      }
-
-      // Rejection History
-      if (booking.rejectionHistory) {
-        for (const rejection of booking.rejectionHistory as any[]) {
-          const rejecter = await this.getUser(rejection.rejectedBy);
+  
+        // Department Approval
+        if (booking.departmentApproverId) {
+          const approver = usersMap.get(booking.departmentApproverId);
           journey.push({
-            stage: "Rejection",
-            status: "Rejected",
-            actor: rejecter ? { id: rejecter.id, name: rejecter.name } : null,
-            timestamp: rejection.rejectedAt,
-            notes: rejection.reason,
+            stage: "Department Approval",
+            status: booking.status === BookingStatus.PENDING_ADMIN_APPROVAL || booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
+            actor: approver ? { id: approver.id, name: approver.name } : null,
+            timestamp: booking.departmentApprovalAt,
+            notes: booking.departmentNotes,
           });
         }
+  
+        // Admin Approval
+        if (booking.adminApproverId) {
+          const approver = usersMap.get(booking.adminApproverId);
+          journey.push({
+            stage: "Admin Approval",
+            status: booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.ALLOCATED ? "Approved" : "Pending",
+            actor: approver ? { id: approver.id, name: approver.name } : null,
+            timestamp: booking.adminApprovalAt,
+            notes: booking.adminNotes,
+          });
+        }
+  
+        // Rejection History
+        if (booking.rejectionHistory) {
+          for (const rejection of booking.rejectionHistory as any[]) {
+            const rejecter = usersMap.get(rejection.rejectedBy);
+            journey.push({
+              stage: "Rejection",
+              status: "Rejected",
+              actor: rejecter ? { id: rejecter.id, name: rejecter.name } : null,
+              timestamp: rejection.rejectedAt,
+              notes: rejection.reason,
+            });
+          }
+        }
+  
+        // Room Allocation
+        if (booking.status === BookingStatus.ALLOCATED) {
+          journey.push({
+            stage: "Room Allocation",
+            status: "Allocated",
+            actor: null,
+            timestamp: booking.updatedAt,
+            notes: booking.vfastNotes,
+          });
+        }
+  
+        // Sort journey by timestamp
+        journey.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  
+        return journey;
+      } catch (error: any) {
+        console.error(`Error in getBookingJourney for booking ID ${bookingId}:`, error);
+        throw new Error("Failed to retrieve booking journey.");
       }
-      
-      // Room Allocation
-      if (booking.status === BookingStatus.ALLOCATED) {
-        journey.push({
-          stage: "Room Allocation",
-          status: "Allocated",
-          actor: null, // VFAST user details can be added here if needed
-          timestamp: booking.updatedAt, // Assuming updatedAt is the allocation time
-          notes: booking.vfastNotes,
-        });
-      }
-
-      // Sort journey by timestamp
-      journey.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-      return journey;
-    } catch (error: any) {
-      console.error(`Error in getBookingJourney for booking ID ${bookingId}:`, error);
-      throw new Error("Failed to retrieve booking journey.");
     }
-  }
-
   async updateBookingWorkflowStage(bookingId: number, stage: WorkflowStage, checkInStatus?: GuestCheckInStatus): Promise<Booking | undefined> {
     try {
       const updateSet: Partial<Booking> = { currentWorkflowStage: stage };
@@ -1160,6 +1177,26 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       console.error("Error in getVFastAllocationStats:", error);
       throw new Error("Failed to retrieve VFast allocation stats.");
+    }
+  }
+
+  async getTotalUsers(): Promise<number> {
+    try {
+      const [result] = await this.dbClient.select({ count: sql<number>`count(*)` }).from(users);
+      return result.count;
+    } catch (error: any) {
+      console.error("Error in getTotalUsers:", error);
+      throw new Error("Failed to retrieve total users count.");
+    }
+  }
+
+  async getTotalDepartments(): Promise<number> {
+    try {
+      const [result] = await this.dbClient.select({ count: sql<number>`count(*)` }).from(departments);
+      return result.count;
+    } catch (error: any) {
+      console.error("Error in getTotalDepartments:", error);
+      throw new Error("Failed to retrieve total departments count.");
     }
   }
 }

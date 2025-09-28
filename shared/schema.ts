@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -70,8 +70,12 @@ export const users = pgTable("users", {
   role: text("role").notNull().default(UserRole.BOOKING),
   googleId: text("google_id").unique(),
   mobileNumber: text("mobile_number"),
-  department_id: integer("department_id").references(() => departments.id),
+  department_id: integer("department_id").references(() => departments.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+}, (users) => {
+  return {
+    emailIdx: uniqueIndex("email_idx").on(users.email),
+  };
 });
 
 // Insert schema for user registration
@@ -122,6 +126,16 @@ export const bookings = pgTable("bookings", {
   documentPath: text("document_path"),
   keyHandedOver: boolean("key_handed_over").default(false),
   firstCheckedInGuestName: text("first_checked_in_guest_name"), // New column
+}, (bookings) => {
+  return {
+    userIdx: index("user_id_idx").on(bookings.userId),
+    statusIdx: index("status_idx").on(bookings.status),
+    departmentIdIdx: index("department_id_idx").on(bookings.department_id),
+    checkInDateIdx: index("check_in_date_idx").on(bookings.checkInDate),
+    checkOutDateIdx: index("check_out_date_idx").on(bookings.checkOutDate),
+    roomNumberIdx: index("room_number_idx").on(bookings.roomNumber),
+    roomAvailabilityIdx: index("room_availability_idx").on(bookings.roomNumber, bookings.checkInDate, bookings.checkOutDate),
+  };
 });
 
 // Insert schema for booking creation
@@ -174,6 +188,11 @@ export const rooms = pgTable("rooms", {
   reservedBy: integer("reserved_by").references(() => users.id, { onDelete: "set null" }),
   reservedAt: timestamp("reserved_at"),
   reservationNotes: text("reservation_notes"),
+}, (rooms) => {
+  return {
+    roomStatusIdx: index("room_status_idx").on(rooms.status),
+    reservedByIdx: index("reserved_by_idx").on(rooms.reservedBy),
+  };
 });
 
 // Insert schema for room creation
@@ -187,7 +206,7 @@ export type LoginUser = z.infer<typeof loginUserSchema>;
 
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
-export type UpdateBookingStatus = z.infer<typeof updateBookingStatusSchema>;
+
 export type RoomAllocation = z.infer<typeof roomAllocationSchema>;
 
 export type Room = typeof rooms.$inferSelect;

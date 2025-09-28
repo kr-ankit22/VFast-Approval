@@ -3,24 +3,10 @@
   "dialect": "postgresql",
   "entries": [
     {
-      "idx": 0,
+      "idx": 17,
       "version": "7",
-      "when": 1756661726127,
-      "tag": "0000_certain_vector",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1756759664841,
-      "tag": "0001_absent_lady_vermin",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1756760000000,
-      "tag": "0002_add_room_status",
+      "when": 1759000000000,
+      "tag": "0017_add_performance_indexes",
       "breakpoints": true
     }
   ]

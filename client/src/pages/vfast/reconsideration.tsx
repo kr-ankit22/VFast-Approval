@@ -12,16 +12,12 @@ export default function ReconsiderationPage() {
   const reconsiderationBookings = bookings?.filter(b => b.status === BookingStatus.PENDING_RECONSIDERATION) || [];
 
   return (
-    <DashboardLayout
-      title="V-Fast Queues"
-      description="Manage room allocations and reconsideration requests"
-      role={UserRole.VFAST}
-    >
+    <>
       <VFastBookingQueue 
         allocationBookings={allocationBookings}
         reconsiderationBookings={reconsiderationBookings}
         isLoading={isLoading}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -35,16 +35,11 @@ export default function BookingDetailsPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout
-        title="Booking Details"
-        description="Loading booking details..."
-        role={UserRole.BOOKING}
-      >
+      <div className="flex items-center justify-center py-8">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading booking details...</span>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
@@ -55,46 +50,30 @@ export default function BookingDetailsPage() {
       variant: "destructive",
     });
     return (
-      <DashboardLayout
-        title="Booking Details"
-        description="Error loading booking details"
-        role={UserRole.BOOKING}
-      >
-        <div className="text-center py-8 text-red-500">
-          <X className="h-8 w-8 mx-auto mb-2" />
-          <p>Failed to load booking details: {error?.message}</p>
-          <Button asChild className="mt-4">
-            <Link href="/booking/history">Back to My Bookings</Link>
-          </Button>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-8 text-red-500">
+        <X className="h-8 w-8 mx-auto mb-2" />
+        <p>Failed to load booking details: {error?.message}</p>
+        <Button asChild className="mt-4">
+          <Link href="/booking/history">Back to My Bookings</Link>
+        </Button>
+      </div>
     );
   }
 
   if (!booking) {
     return (
-      <DashboardLayout
-        title="Booking Details"
-        description="Booking not found"
-        role={UserRole.BOOKING}
-      >
-        <div className="text-center py-8 text-gray-500">
-          <FileText className="h-8 w-8 mx-auto mb-2" />
-          <p>Booking not found.</p>
-          <Button asChild className="mt-4">
-            <Link href="/booking/history">Back to My Bookings</Link>
-          </Button>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-8 text-gray-500">
+        <FileText className="h-8 w-8 mx-auto mb-2" />
+        <p>Booking not found.</p>
+        <Button asChild className="mt-4">
+          <Link href="/booking/history">Back to My Bookings</Link>
+        </Button>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout
-      title={`Booking #${booking.id}`}
-      description="Detailed view of your booking request"
-      role={UserRole.BOOKING}
-    >
+    <div className="container mx-auto py-8">
       <Card>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
@@ -220,6 +199,6 @@ export default function BookingDetailsPage() {
           <BookingJourney bookingId={booking.id} />
         </CardContent>
       </Card>
-    </DashboardLayout>
-  );
+      </div>
+    );
 }

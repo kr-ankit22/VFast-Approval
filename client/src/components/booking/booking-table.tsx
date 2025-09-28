@@ -11,34 +11,34 @@ type BookingTableProps = {
 
 export default function BookingTable({ bookings, renderActions, showRequestType }: BookingTableProps) {
   return (
-    <Table>
+    <Table className="w-full min-w-full">
       <TableHeader>
         <TableRow>
-          <TableHead>Purpose</TableHead>
-          <TableHead>Check-in</TableHead>
-          <TableHead>Check-out</TableHead>
-          <TableHead>Status</TableHead>
-          {showRequestType && <TableHead>Request Type</TableHead>}
-          {renderActions && <TableHead>Actions</TableHead>}
+          <TableHead className="whitespace-nowrap">Purpose</TableHead>
+          <TableHead className="whitespace-nowrap">Check-in</TableHead>
+          <TableHead className="whitespace-nowrap">Check-out</TableHead>
+          <TableHead className="whitespace-nowrap">Status</TableHead>
+          {showRequestType && <TableHead className="whitespace-nowrap">Request Type</TableHead>}
+          {renderActions && <TableHead className="whitespace-nowrap">Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {bookings.map((booking) => (
           <TableRow key={booking.id}>
-            <TableCell>{booking.purpose}</TableCell>
-            <TableCell>{new Date(booking.checkInDate).toLocaleDateString()}</TableCell>
-            <TableCell>{new Date(booking.checkOutDate).toLocaleDateString()}</TableCell>
-            <TableCell>
+            <TableCell className="whitespace-nowrap">{booking.purpose}</TableCell>
+            <TableCell className="whitespace-nowrap">{new Date(booking.checkInDate).toLocaleDateString()}</TableCell>
+            <TableCell className="whitespace-nowrap">{new Date(booking.checkOutDate).toLocaleDateString()}</TableCell>
+            <TableCell className="whitespace-nowrap">
               <Badge>{booking.status}</Badge>
             </TableCell>
             {showRequestType && (
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Badge variant={booking.isReconsidered ? "secondary" : "default"}>
                   {booking.isReconsidered ? "Reconsidered" : "New"}
                 </Badge>
               </TableCell>
             )}
-            {renderActions && <TableCell>{renderActions(booking)}</TableCell>}
+            {renderActions && <TableCell className="whitespace-nowrap">{renderActions(booking)}</TableCell>}
           </TableRow>
         ))}
       </TableBody>

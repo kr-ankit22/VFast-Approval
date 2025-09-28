@@ -149,12 +149,7 @@ export default function RoomManagement() {
   };
 
   return (
-    <TooltipProvider>
-    <DashboardLayout
-      title="Room Management"
-      description="View and manage all rooms in the VFast hostel"
-      role={user?.role}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -321,7 +316,6 @@ export default function RoomManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DashboardLayout>
-    </TooltipProvider>
+    </>
   );
 }

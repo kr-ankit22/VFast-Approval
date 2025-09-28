@@ -110,11 +110,7 @@ export default function DepartmentBookingRequests() {
   };
 
   return (
-    <DashboardLayout 
-      title="Booking Requests"
-      description="Review and manage booking requests for your department"
-      role={UserRole.DEPARTMENT_APPROVER}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -261,6 +257,6 @@ export default function DepartmentBookingRequests() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </DashboardLayout>
+    </>
   );
 }

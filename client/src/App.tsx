@@ -33,6 +33,7 @@ import VFastAllBookingRequests from "@/pages/vfast/all-booking-requests";
 import VFastRoomInventory from "@/pages/vfast/room-inventory";
 import RoomAvailabilityPage from "@/pages/vfast/room-availability";
 import GuestWorklistPage from "@/pages/vfast/guest-worklist";
+import ProfilePage from "@/pages/profile-page";
 
 import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
 
@@ -49,131 +50,117 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
 
       {/* Profile Page (accessible by all roles) */}
-      <ProtectedRoute path="/profile" role={UserRole.BOOKING} component={() => (
-        <DashboardLayout title="Profile" description="Manage your profile settings" role={UserRole.BOOKING}>
-          <ProfilePage />
-        </DashboardLayout>
-      )} />
-      <ProtectedRoute path="/profile" role={UserRole.DEPARTMENT_APPROVER} component={() => (
-        <DashboardLayout title="Profile" description="Manage your profile settings" role={UserRole.DEPARTMENT_APPROVER}>
-          <ProfilePage />
-        </DashboardLayout>
-      )} />
-      <ProtectedRoute path="/profile" role={UserRole.ADMIN} component={() => (
-        <DashboardLayout title="Profile" description="Manage your profile settings" role={UserRole.ADMIN}>
-          <ProfilePage />
-        </DashboardLayout>
-      )} />
-      <ProtectedRoute path="/profile" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="Profile" description="Manage your profile settings" role={UserRole.VFAST}>
+      <ProtectedRoute path="/profile" role={[UserRole.BOOKING, UserRole.DEPARTMENT_APPROVER, UserRole.ADMIN, UserRole.VFAST]} component={({ user }) => (
+        <DashboardLayout title="Profile" description="Manage your profile settings" role={user.role as UserRole}>
           <ProfilePage />
         </DashboardLayout>
       )} />
       
       {/* Booking User Routes */}
-      <ProtectedRoute path="/booking" role={UserRole.BOOKING} component={() => (
-        <DashboardLayout title="Booking Dashboard" description="Overview of your bookings" role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking" role={UserRole.BOOKING} component={({ user }) => (
+        <DashboardLayout title="Booking Dashboard" description="Overview of your bookings" role={user.role as UserRole}>
           <BookingUserDashboard />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/booking/create" role={UserRole.BOOKING} component={() => (
-        <DashboardLayout title="New Booking" description="Submit a new booking request" role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking/create" role={UserRole.BOOKING} component={({ user }) => (
+        <DashboardLayout title="New Booking" description="Submit a new booking request" role={user.role as UserRole}>
           <CreateBooking />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/booking/history" role={UserRole.BOOKING} component={() => (
-        <DashboardLayout title="Booking History" description="View your past and current bookings" role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking/history" role={UserRole.BOOKING} component={({ user }) => (
+        <DashboardLayout title="Booking History" description="View your past and current bookings" role={user.role as UserRole}>
           <BookingHistory />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/booking/:id" role={UserRole.BOOKING} component={({ id }) => (
-        <DashboardLayout title="Booking Details" description={`Details for Booking #${id}`} role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking/:id" role={UserRole.BOOKING} component={({ user, id }) => (
+        <DashboardLayout title="Booking Details" description={`Details for Booking #${id}`} role={user.role as UserRole}>
           <BookingDetailsPage id={id} />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/booking/reconsider/:id" role={UserRole.BOOKING} component={({ id }) => (
-        <DashboardLayout title="Reconsider Booking" description={`Reconsider Booking #${id}`} role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking/reconsider/:id" role={UserRole.BOOKING} component={({ user, id }) => (
+        <DashboardLayout title="Reconsider Booking" description={`Reconsider Booking #${id}`} role={user.role as UserRole}>
           <ReconsiderBookingPage id={id} />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/booking/reconsider" role={UserRole.BOOKING} component={() => (
-        <DashboardLayout title="Reconsideration Worklist" description="View bookings pending reconsideration" role={UserRole.BOOKING}>
+      <ProtectedRoute path="/booking/reconsider" role={UserRole.BOOKING} component={({ user }) => (
+        <DashboardLayout title="Reconsideration Worklist" description="View bookings pending reconsideration" role={user.role as UserRole}>
           <ReconsiderWorklist />
         </DashboardLayout>
       )} />
       
       {/* Department Approver Routes */}
-      <ProtectedRoute path="/department" role={UserRole.DEPARTMENT_APPROVER} component={() => (
-        <DashboardLayout title="Department Dashboard" description="Overview of department approvals" role={UserRole.DEPARTMENT_APPROVER}>
+      <ProtectedRoute path="/department" role={UserRole.DEPARTMENT_APPROVER} component={({ user }) => (
+        <DashboardLayout title="Department Dashboard" description="Overview of department approvals" role={user.role as UserRole}>
           <DepartmentApproverDashboard />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/department/requests" role={UserRole.DEPARTMENT_APPROVER} component={() => (
-        <DashboardLayout title="Booking Requests" description="Review and approve department booking requests" role={UserRole.DEPARTMENT_APPROVER}>
+      <ProtectedRoute path="/department/requests" role={UserRole.DEPARTMENT_APPROVER} component={({ user }) => (
+        <DashboardLayout title="Booking Requests" description="Review and approve department booking requests" role={user.role as UserRole}>
           <DepartmentBookingRequests />
         </DashboardLayout>
       )} />
 
       {/* Admin Routes */}
-      <ProtectedRoute path="/admin" role={UserRole.ADMIN} component={() => (
-        <DashboardLayout title="Admin Dashboard" description="Overview of system administration" role={UserRole.ADMIN}>
+      <ProtectedRoute path="/admin" role={UserRole.ADMIN} component={({ user }) => (
+        <DashboardLayout title="Admin Dashboard" description="Overview of system administration" role={user.role as UserRole}>
           <AdminDashboard />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/admin/requests" role={UserRole.ADMIN} component={() => (
-        <DashboardLayout title="Booking Requests" description="Manage all booking requests" role={UserRole.ADMIN}>
+      <ProtectedRoute path="/admin/requests" role={UserRole.ADMIN} component={({ user }) => (
+        <DashboardLayout title="Booking Requests" description="Manage all booking requests" role={user.role as UserRole}>
           <BookingRequests />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/admin/rooms" role={UserRole.ADMIN} component={() => (
-        <DashboardLayout title="Room Management" description="Manage hostel rooms and their status" role={UserRole.ADMIN}>
+      <ProtectedRoute path="/admin/rooms" role={UserRole.ADMIN} component={({ user }) => (
+        <DashboardLayout title="Room Management" description="Manage hostel rooms and their status" role={user.role as UserRole}>
           <RoomManagement />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/admin/user-provisioning" role={UserRole.ADMIN} component={() => (
-        <DashboardLayout title="User Management" description="Manage user accounts and roles" role={UserRole.ADMIN}>
+
+      <ProtectedRoute path="/admin/user-provisioning" role={UserRole.ADMIN} component={({ user }) => (
+        <DashboardLayout title="User Management" description="Manage user accounts and roles" role={user.role as UserRole}>
           <UserManagementPage />
         </DashboardLayout>
       )} />
       
       {/* VFast Routes */}
-      <ProtectedRoute path="/vfast" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="VFast Dashboard" description="Overview of VFast operations" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="VFast Dashboard" description="Overview of VFast operations" role={user.role as UserRole}>
           <VFastDashboard />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/workflow/:id?" role={UserRole.VFAST} component={({ id }) => (
-        <DashboardLayout title="Booking Workflow" description={`Manage booking workflow for Booking #${id}`} role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/workflow/:id?" role={UserRole.VFAST} component={({ user, id }) => (
+        <DashboardLayout title="Booking Workflow" description={`Manage booking workflow for Booking #${id}`} role={user.role as UserRole}>
           <BookingWorkflowPage id={id} />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/reconsideration" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="Reconsideration Requests" description="Review and manage reconsideration requests" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/reconsideration" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="Reconsideration Requests" description="Review and manage reconsideration requests" role={user.role as UserRole}>
           <Reconsideration />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/all-booking-requests" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="All Booking Requests" description="View and manage all booking requests" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/all-booking-requests" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="All Booking Requests" description="View and manage all booking requests" role={user.role as UserRole}>
           <VFastAllBookingRequests />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/all-booking-requests/:id" role={UserRole.VFAST} component={({ id }) => (
-        <DashboardLayout title="Booking Details" description={`Details for Booking #${id}`} role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/all-booking-requests/:id" role={UserRole.VFAST} component={({ user, id }) => (
+        <DashboardLayout title="Booking Details" description={`Details for Booking #${id}`} role={user.role as UserRole}>
           <VFastAllBookingRequests id={id} />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/room-inventory" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="Room Inventory" description="Manage room inventory and maintenance" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/room-inventory" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="Room Inventory" description="Manage room inventory and maintenance" role={user.role as UserRole}>
           <VFastRoomInventory />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/room-availability" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="Room Availability" description="View room availability" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/room-availability" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="Room Availability" description="View room availability" role={user.role as UserRole}>
           <RoomAvailabilityPage />
         </DashboardLayout>
       )} />
-      <ProtectedRoute path="/vfast/guest-worklist" role={UserRole.VFAST} component={() => (
-        <DashboardLayout title="Guest Worklist" description="Manage guest check-ins and check-outs" role={UserRole.VFAST}>
+      <ProtectedRoute path="/vfast/guest-worklist" role={UserRole.VFAST} component={({ user }) => (
+        <DashboardLayout title="Guest Worklist" description="Manage guest check-ins and check-outs" role={user.role as UserRole}>
           <GuestWorklistPage />
         </DashboardLayout>
       )} />

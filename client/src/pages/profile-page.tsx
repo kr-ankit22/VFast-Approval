@@ -69,7 +69,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <DashboardLayout title="Profile" description="View and edit your profile." role={authUser?.role as UserRole || UserRole.BOOKING}>
+    <>
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -112,6 +112,6 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
-    </DashboardLayout>
+    </>
   );
 }

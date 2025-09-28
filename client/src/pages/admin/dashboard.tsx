@@ -66,11 +66,7 @@ export default function AdminDashboard() {
   };
   
   return (
-    <DashboardLayout 
-      title="Admin Dashboard" 
-      description={`Welcome back, ${user?.name}. Here's an overview of the hostel bookings.`}
-      role={UserRole.ADMIN}
-    >
+    <>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -243,10 +239,12 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="mb-4">Manage system users and their permissions</p>
-                <Button className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Manage Users
-                </Button>
+                <Link href="/admin/user-provisioning">
+                  <Button className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Manage Users
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -273,21 +271,17 @@ export default function AdminDashboard() {
                 {allRooms.slice(0, 10).map((room) => (
                   <div 
                     key={room.id} 
-                    className={`p-4 rounded-lg border flex flex-col items-center ${
-                      room.status === RoomStatus.AVAILABLE 
+                    className={`p-4 rounded-lg border flex flex-col items-center ${room.status === RoomStatus.AVAILABLE 
                         ? 'border-green-200 bg-green-50' 
                         : 'border-red-200 bg-red-50'
                     }`}
                   >
-                    <HotelIcon className={`h-6 w-6 mb-2 ${
-                      room.status === RoomStatus.AVAILABLE ? 'text-green-500' : 'text-red-500'
-                    }`} />
+                    <HotelIcon className={`h-6 w-6 mb-2 ${room.status === RoomStatus.AVAILABLE ? 'text-green-500' : 'text-red-500'}`} />
                     <div className="text-lg font-semibold">{room.roomNumber}</div>
                     <div className="text-sm text-muted-foreground capitalize">{room.type}</div>
                     <Badge 
                       variant="outline" 
-                      className={`mt-2 ${
-                        room.status === RoomStatus.AVAILABLE 
+                      className={`mt-2 ${room.status === RoomStatus.AVAILABLE 
                           ? 'border-green-500 text-green-500' 
                           : 'border-red-500 text-red-500'
                       }`}
@@ -307,6 +301,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

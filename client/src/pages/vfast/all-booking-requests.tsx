@@ -117,11 +117,7 @@ export default function VFastAllBookingRequests() {
   };
 
   return (
-    <DashboardLayout 
-      title="All Booking Requests"
-      description="View all booking requests across the system"
-      role={UserRole.VFAST}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -175,10 +171,11 @@ export default function VFastAllBookingRequests() {
               )}
             </div>
           ) : (
-            <BookingTable 
-              bookings={filteredBookings}
-              showRequestType={true}
-              renderActions={(booking) => {
+            <div className="rounded-md border overflow-x-auto">
+              <BookingTable 
+                bookings={filteredBookings}
+                showRequestType={true}
+                renderActions={(booking) => {
                 const canApprove = user?.role === UserRole.VFAST && booking.status === BookingStatus.PENDING_RECONSIDERATION;
                 return (
                   <div className="flex gap-2">
@@ -229,6 +226,7 @@ export default function VFastAllBookingRequests() {
                 )
               }}
             />
+            </div>
           )}
 
           <div className="mt-4 flex justify-between items-center text-sm">
@@ -248,6 +246,6 @@ export default function VFastAllBookingRequests() {
           userRole={UserRole.VFAST}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,70 +1,50 @@
 import bcrypt from 'bcrypt';
 import { db } from "../server/db";
 import { users, UserRole } from "../shared/schema";
+import { eq } from 'drizzle-orm';
 
 async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
+}
+
+async function createOrUpdateUser(email: string, name: string, role: UserRole, passwordHash: string, department_id?: number) {
+  let user = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (user) {
+    await db.update(users).set({
+      name,
+      password: passwordHash,
+      role,
+      department_id: department_id || null,
+    }).where(eq(users.id, user.id));
+    console.log(`Updated user: ${email}`);
+  } else {
+    await db.insert(users).values({
+      name,
+      email,
+      password: passwordHash,
+      role,
+      department_id: department_id || null,
+    });
+    console.log(`Created user: ${email}`);
+  }
 }
 
 async function createSampleUsers() {
   try {
     console.log("Creating sample users...");
 
-    // Create a student (booking user)
-    const studentPassword = await hashPassword("password123");
-    const student = await db
-      .insert(users)
-      .values({
-        name: "BITS Student",
-        email: "student@bits.ac.in",
-        password: studentPassword,
-        role: UserRole.BOOKING,
-        department_id: 1, // Assuming "Computer Science" is the first department
-      })
-      .returning();
-    console.log("Created student user:", student[0].email);
-    
-    // Create an admin user
-    const adminPassword = await hashPassword("password123");
-    const admin = await db
-      .insert(users)
-      .values({
-        name: "BITS Admin",
-        email: "admin@bits.ac.in",
-        password: adminPassword,
-        role: UserRole.ADMIN
-      })
-      .returning();
-    console.log("Created admin user:", admin[0].email);
-    
-    // Create a VFast user
-    const vfastPassword = await hashPassword("password123");
-    const vfast = await db
-      .insert(users)
-      .values({
-        name: "VFast Manager",
-        email: "vfast@bits.ac.in",
-        password: vfastPassword,
-        role: UserRole.VFAST
-      })
-      .returning();
-    console.log("Created vfast user:", vfast[0].email);
+    const password = "password123";
+    const hashedPassword = await hashPassword(password);
 
-    // Create a department approver user
-    const departmentApproverPassword = await hashPassword("password123");
-    const departmentApprover = await db
-      .insert(users)
-      .values({
-        name: "Department Approver",
-        email: "approver@bits.ac.in",
-        password: departmentApproverPassword,
-        role: UserRole.DEPARTMENT_APPROVER,
-        department_id: 1, // Assuming "Computer Science" is the first department
-      })
-      .returning();
-    console.log("Created department approver user:", departmentApprover[0].email);
+    await createOrUpdateUser("student@bits.ac.in", "BITS Student", UserRole.BOOKING, hashedPassword, 1);
+    await createOrUpdateUser("admin@bits.ac.in", "BITS Admin", UserRole.ADMIN, hashedPassword);
+    await createOrUpdateUser("vfast@bits.ac.in", "VFast Manager", UserRole.VFAST, hashedPassword);
+    await createOrUpdateUser("approver@bits.ac.in", "Department Approver", UserRole.DEPARTMENT_APPROVER, hashedPassword, 1);
     
-    console.log("Successfully created all sample users!");
+    console.log("Successfully created/updated all sample users!");
   } catch (error) {
     console.error("Error creating sample users:", error);
   } finally {

@@ -78,11 +78,7 @@ export default function BookingWorkflowPage() {
   const allocationBookings = bookings?.filter(b => b.status === BookingStatus.APPROVED) || [];
 
   return (
-    <DashboardLayout
-      title="Room Allocation"
-      description="Manage and allocate rooms for approved bookings."
-      role={UserRole.VFAST}
-    >
+    <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -125,23 +121,25 @@ export default function BookingWorkflowPage() {
               <p>No bookings currently pending allocation.</p>
             </div>
           ) : (
-            <AllocationTable
-              bookings={allocationBookings}
-              renderActions={(booking) => (
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
-                  <Button size="sm" onClick={() => handleAllocateRoom(booking)}>Allocate</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking.id)}>Reject</Button>
-                </div>
-              )}
-            />
+            <div className="overflow-x-auto">
+              <AllocationTable
+                bookings={allocationBookings}
+                renderActions={(booking) => (
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
+                    <Button size="sm" onClick={() => handleAllocateRoom(booking)}>Allocate</Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleRejectBooking(booking.id)}>Reject</Button>
+                  </div>
+                )}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
 
       {selectedBooking && (
         <Dialog open={isAllocationDialogOpen} onOpenChange={setIsAllocationDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="w-full max-w-full sm:max-w-md md:max-w-lg p-4">
             <DialogHeader>
               <DialogTitle>Allocate Room for Booking #{selectedBooking.id}</DialogTitle>
             </DialogHeader>
@@ -165,6 +163,6 @@ export default function BookingWorkflowPage() {
           }}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

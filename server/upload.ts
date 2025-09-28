@@ -10,7 +10,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const bookingId = req.params.bookingId;
+    const bookingId = (req as any).params.bookingId;
     const ext = path.extname(file.originalname);
     const filename = `${bookingId}-${Date.now()}${ext}`;
     cb(null, filename);
@@ -21,7 +21,8 @@ const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     console.log('Uploaded file mimetype:', file.mimetype);
-    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed' || ext === '.zip') {
       cb(null, true);
     } else {
       cb(new Error('Only .zip files are allowed!'));

@@ -54,11 +54,7 @@ export default function DepartmentApproverDashboard() {
   };
   
   return (
-    <DashboardLayout 
-      title="Department Approver Dashboard" 
-      description={`Welcome back, ${user?.name}. Here's an overview of the hostel bookings for your department.`}
-      role={UserRole.DEPARTMENT_APPROVER}
-    >
+    <>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Card>
@@ -176,7 +172,7 @@ export default function DepartmentApproverDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 }
 

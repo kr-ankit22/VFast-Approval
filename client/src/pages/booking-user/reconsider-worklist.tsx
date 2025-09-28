@@ -64,11 +64,7 @@ export default function ReconsiderWorklist() {
   });
   
   return (
-    <DashboardLayout 
-      title="Reconsideration Worklist" 
-      description="View and manage your rejected booking requests that can be reconsidered."
-      role={UserRole.BOOKING}
-    >
+    <>
       <div className="bg-white p-6 rounded-lg shadow mb-8">
         <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
           <div className="relative flex-1">
@@ -171,6 +167,6 @@ export default function ReconsiderWorklist() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

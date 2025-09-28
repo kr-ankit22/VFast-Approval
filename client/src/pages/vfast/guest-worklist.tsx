@@ -68,11 +68,7 @@ export default function GuestWorklistPage() {
   const filteredBookings = getFilteredBookings();
 
   return (
-    <DashboardLayout
-      title="Guest Worklist"
-      description="Manage allocated and checked-in bookings and their guests."
-      role={UserRole.VFAST}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -116,7 +112,7 @@ export default function GuestWorklistPage() {
               )}
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -182,6 +178,6 @@ export default function GuestWorklistPage() {
           )}
         </CardContent>
       </Card>
-    </DashboardLayout>
+    </>
   );
 }

@@ -36,17 +36,21 @@ passport.use(
 
 // Serialize user into the session
 passport.serializeUser((user: any, done) => {
+
   done(null, user.id);
 });
 
 // Deserialize user from the session
 passport.deserializeUser(async (id: string, done) => {
+
   try {
     const user = await db.query.users.findFirst({
-      where: eq(users.id, id),
+      where: eq(users.id, parseInt(id, 10)),
     });
+
     done(null, user);
   } catch (error) {
+    console.error("Passport: Error deserializing user:", error);
     done(error, undefined);
   }
 });

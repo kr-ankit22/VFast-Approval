@@ -257,11 +257,7 @@ export default function VFastRoomInventory() {
 
   return (
     <TooltipProvider>
-    <DashboardLayout
-      title="Room Inventory"
-      description="View all rooms in the VFast hostel"
-      role={UserRole.VFAST}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -312,7 +308,7 @@ export default function VFastRoomInventory() {
               )}
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -426,7 +422,7 @@ export default function VFastRoomInventory() {
       {/* Maintenance Dialog */}
       {selectedRoomForMaintenance && (
         <Dialog open={isMaintenanceDialogOpen} onOpenChange={setIsMaintenanceDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-md md:max-w-lg">
             <DialogHeader>
               <DialogTitle>Mark Room {selectedRoomForMaintenance.roomNumber} for Maintenance</DialogTitle>
               <DialogDescription>
@@ -560,7 +556,7 @@ export default function VFastRoomInventory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DashboardLayout>
+    </>
     </TooltipProvider>
   );
 }

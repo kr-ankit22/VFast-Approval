@@ -97,11 +97,7 @@ export default function BookingHistory() {
   });
   
   return (
-    <DashboardLayout 
-      title="My Bookings" 
-      description="View and manage all your hostel booking requests"
-      role={UserRole.BOOKING}
-    >
+    <>
       <div className="bg-white p-6 rounded-lg shadow mb-8">
         <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
           <div className="relative flex-1">
@@ -311,6 +307,6 @@ export default function BookingHistory() {
           userRole={UserRole.BOOKING}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

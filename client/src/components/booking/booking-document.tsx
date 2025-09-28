@@ -18,8 +18,8 @@ export default function BookingDocument({ bookingId, documentPath }: BookingDocu
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
-      formData.append("document", file);
-      const res = await apiRequest("POST", `/api/bookings/${bookingId}/upload-document`, formData);
+      formData.append("file", file);
+      const res = await apiRequest("POST", `/api/bookings/${bookingId}/document`, formData, true);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to upload document");

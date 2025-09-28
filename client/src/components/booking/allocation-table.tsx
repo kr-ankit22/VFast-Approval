@@ -11,28 +11,28 @@ type AllocationTableProps = {
 
 export default function AllocationTable({ bookings, renderActions }: AllocationTableProps) {
   return (
-    <Table>
+    <Table className="w-full min-w-full">
       <TableHeader>
         <TableRow>
-          <TableHead>Ticket Age</TableHead>
-          <TableHead>Booking ID</TableHead>
-          <TableHead>Purpose</TableHead>
-          <TableHead>Department</TableHead>
-          <TableHead>Check-in</TableHead>
-          <TableHead>Check-out</TableHead>
-          {renderActions && <TableHead>Actions</TableHead>}
+          <TableHead className="whitespace-nowrap">Ticket Age</TableHead>
+          <TableHead className="whitespace-nowrap">Booking ID</TableHead>
+          <TableHead className="whitespace-nowrap">Purpose</TableHead>
+          <TableHead className="whitespace-nowrap">Department</TableHead>
+          <TableHead className="whitespace-nowrap">Check-in</TableHead>
+          <TableHead className="whitespace-nowrap">Check-out</TableHead>
+          {renderActions && <TableHead className="whitespace-nowrap">Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {bookings.map((booking) => (
           <TableRow key={booking.id}>
-            <TableCell>{formatDistanceToNow(new Date(booking.departmentApprovalAt), { addSuffix: true })}</TableCell>
-            <TableCell>{booking.id}</TableCell>
-            <TableCell>{booking.purpose}</TableCell>
-            <TableCell>{booking.departmentName}</TableCell>
-            <TableCell>{new Date(booking.checkInDate).toLocaleDateString()}</TableCell>
-            <TableCell>{new Date(booking.checkOutDate).toLocaleDateString()}</TableCell>
-            {renderActions && <TableCell>{renderActions(booking)}</TableCell>}
+            <TableCell className="whitespace-nowrap">{formatDistanceToNow(new Date(booking.departmentApprovalAt), { addSuffix: true })}</TableCell>
+            <TableCell className="whitespace-nowrap">{booking.id}</TableCell>
+            <TableCell className="whitespace-nowrap">{booking.purpose}</TableCell>
+            <TableCell className="whitespace-nowrap">{booking.departmentName}</TableCell>
+            <TableCell className="whitespace-nowrap">{new Date(booking.checkInDate).toLocaleDateString()}</TableCell>
+            <TableCell className="whitespace-nowrap">{new Date(booking.checkOutDate).toLocaleDateString()}</TableCell>
+            {renderActions && <TableCell className="whitespace-nowrap">{renderActions(booking)}</TableCell>}
           </TableRow>
         ))}
       </TableBody>

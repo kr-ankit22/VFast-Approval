@@ -1,11 +1,11 @@
 
 import { useState, Fragment } from "react";
-import { 
-  ColumnDef, 
-  flexRender, 
-  getCoreRowModel, 
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
   getExpandedRowModel,
-  useReactTable 
+  useReactTable
 } from "@tanstack/react-table";
 import {
   Table,
@@ -51,7 +51,6 @@ const GuestDetails = ({ guest }: { guest: Guest }) => (
 
 export default function GuestDataTable({ guests, departmentName, onEdit, onCheckIn, onCheckOut }: GuestDataTableProps) {
   const [expanded, setExpanded] = useState({});
-
   const columns: ColumnDef<Guest>[] = [
     {
       id: "expander",
@@ -134,23 +133,23 @@ export default function GuestDataTable({ guests, departmentName, onEdit, onCheck
 
   return (
     <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (

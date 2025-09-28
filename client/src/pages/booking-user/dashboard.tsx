@@ -25,11 +25,7 @@ export default function BookingUserDashboard() {
   ).length;
   
   return (
-    <DashboardLayout 
-      title="Student Dashboard" 
-      description={`Welcome back, ${user?.name}. Here's an overview of your hostel bookings.`}
-      role={UserRole.BOOKING}
-    >
+    <>
       {/* Stats overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
@@ -93,6 +89,6 @@ export default function BookingUserDashboard() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

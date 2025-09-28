@@ -18,18 +18,24 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
   app.use(express.urlencoded({ extended: false }));
   app.use('/uploads', express.static('uploads'));
 
-  app.use(
-    session({
-      store: new PgStore({
-        pool: pool,
-        tableName: "user_sessions",
-      }),
-      secret: process.env.SESSION_SECRET || "a-secret-key-for-sessions",
-      resave: false,
-      saveUninitialized: false,
-      cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
-    })
-  );
+  try {
+    app.use(
+      session({
+        store: new PgStore({
+          pool: pool,
+          tableName: "user_sessions",
+        }),
+        secret: process.env.SESSION_SECRET || "a-secret-key-for-sessions",
+        resave: false,
+        saveUninitialized: false,
+        cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+      })
+    );
+    console.log("PgStore (connect-pg-simple) initialized.");
+  } catch (error) {
+    console.error("Failed to initialize PgStore (connect-pg-simple):", error);
+    process.exit(1); // Exit if session store cannot be initialized
+  }
 
   app.use(passport.initialize());
   app.use(passport.session());

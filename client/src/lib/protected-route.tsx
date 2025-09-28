@@ -1,12 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
-import { UserRole } from "@shared/schema";
+import { UserRole, User } from "@shared/schema";
 
 type ProtectedRouteProps = {
   path: string;
-  component: () => React.JSX.Element;
-  role?: UserRole;
+  component: React.ComponentType<{ user: User; role: UserRole; [key: string]: any }>;
+  role?: UserRole | UserRole[];
 };
 
 export function ProtectedRoute({ path, component: Component, role }: ProtectedRouteProps) {
@@ -30,8 +30,15 @@ export function ProtectedRoute({ path, component: Component, role }: ProtectedRo
     );
   }
 
-  // If a specific role is required, check if the user has that role
-  if (role && user.role !== role) {
+  const hasRequiredRole = () => {
+    if (!role) return true; // No role required
+    if (Array.isArray(role)) {
+      return role.includes(user.role as UserRole);
+    }
+    return user.role === role;
+  };
+
+  if (!hasRequiredRole()) {
     let redirectPath;
     
     // Redirect to the appropriate dashboard based on user role
@@ -56,5 +63,7 @@ export function ProtectedRoute({ path, component: Component, role }: ProtectedRo
     );
   }
 
-  return <Route path={path} component={Component} />;
+  return <Route path={path}>
+    {(params) => <Component user={user} role={user.role as UserRole} {...params} />}
+  </Route>;
 }

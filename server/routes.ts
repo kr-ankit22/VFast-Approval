@@ -33,7 +33,7 @@ const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
-  department: z.string().optional(),
+  department: z.string(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -68,10 +68,25 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   app.get(
     "/api/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res) => {
-      // Successful authentication, redirect home.
-      res.redirect("/");
+    (req, res, next) => {
+      passport.authenticate("google", (err, user, info) => {
+        if (err) {
+          console.error("Google Auth Error:", err);
+          return res.redirect("/login?error=" + encodeURIComponent(err.message));
+        }
+        if (!user) {
+          console.log("Google Auth Failed - No user:", info);
+          return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
+        }
+        req.logIn(user, (loginErr) => {
+          if (loginErr) {
+            console.error("Google Login: req.logIn failed with error:", loginErr);
+            return res.redirect("/login?error=" + encodeURIComponent(loginErr.message));
+          }
+          console.log("Google Login: req.logIn successful. Redirecting to /.");
+          res.redirect("/");
+        });
+      })(req, res, next);
     }
   );
 
@@ -105,7 +120,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
         // Send welcome email
         try {
-          await sendEmail({
+          sendEmail({
             to: newUser.email,
             subject: "Welcome to VFast Booker!",
             html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
@@ -189,20 +204,50 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        for (const row of results.data as any[]) {
-          const { email, role } = row;
+        const errors: string[] = [];
+        const validRows = [];
+        let created = 0;
+        let updated = 0;
 
-          if (!email || !role) {
-            continue;
+        // First pass: Validate all rows
+        for (const [index, row] of (results.data as any[]).entries()) {
+          const { email, role, department } = row;
+          if (!email || !role || !department) {
+            // Skip empty lines that PapaParse might still pass
+            if (!email && !role && !department) continue;
+            errors.push(`Row ${index + 2}: Missing required fields. 'email', 'role', and 'department' are all mandatory.`);
+          } else {
+            validRows.push(row);
           }
+        }
 
+        if (errors.length > 0) {
+          return res.status(400).json({ message: "CSV validation failed. No users were created or updated.", errors });
+        }
+
+        // Second pass: Process valid rows
+        for (const row of validRows) {
+          const { email, role, name, phone, department } = row;
+          
           const existingUser = await storage.getUserByEmail(email);
 
+          const userData = {
+            name: name || email.split('@')[0],
+            email,
+            role,
+            phone,
+            department_id: parseInt(department, 10)
+          };
+
+          if (isNaN(userData.department_id)) {
+            return res.status(400).json({ message: `Invalid Department ID found for user ${email}. Department must be a number.` });
+          }
+
           if (existingUser) {
-            await storage.updateUser(existingUser.id, { role });
+            await storage.updateUser(existingUser.id, userData);
             updated++;
           } else {
-            await storage.createUser({ name: email.split('@')[0], email, password: 'password', role });
+            await storage.createUser({ ...userData, password: 'password' });
             created++;
           }
         }
@@ -213,6 +258,103 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         res.status(500).json({ message: "Failed to parse CSV file", error });
       },
     });
+  });
+
+  // Admin User Management Endpoints
+
+  // Get all users (Admin only)
+  app.get("/api/admin/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Get user and department stats (Admin only)
+  app.get("/api/admin/stats/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+    try {
+      const totalUsers = await storage.getTotalUsers();
+      const totalDepartments = await storage.getTotalDepartments();
+      res.json({ totalUsers, totalDepartments });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ message: "Failed to fetch user stats" });
+    }
+  });
+
+  // Create a new user (Admin only)
+  app.post("/api/admin/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+    try {
+      const { name, email, password, role, phone, department } = registerSchema.parse(req.body);
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: "User with this email already exists." });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const newUser = await storage.createUser({
+        name,
+        email,
+        password: hashedPassword,
+        role,
+        phone,
+        department_id: department ? parseInt(department) : undefined,
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user." });
+    }
+  });
+
+  // Update a user (Admin only)
+  app.patch("/api/admin/users/:id", checkRole([UserRole.ADMIN]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const updates = req.body;
+
+      // Hash password if provided
+      if (updates.password) {
+        updates.password = await bcrypt.hash(updates.password, 10);
+      }
+
+      const updatedUser = await storage.updateUser(userId, updates);
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user." });
+    }
+  });
+
+  // Delete a user (Admin only)
+  app.delete("/api/admin/users/:id", checkRole([UserRole.ADMIN]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      await storage.deleteUser(userId);
+      res.status(204).send(); // No content
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user." });
+    }
   });
 
   // Get guest worklist (VFast users)
@@ -393,14 +535,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       try {
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
-          await sendEmail({
+          sendEmail({
             to: bookingUser.email,
             subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
-            html: `<h1>Booking Status Update</h1>
-                   <p>Dear ${bookingUser.name},</p>
-                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>
-                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}
-                   <p>Thank you for using VFast Booker.</p>`,
+            html: `<h1>Booking Status Update</h1>\r\n                   <p>Dear ${bookingUser.name},</p>\r\n                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>\r\n                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}\r\n                   <p>Thank you for using VFast Booker.</p>`,
             text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by the Department Approver. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
           });
           console.log(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
@@ -434,6 +572,28 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       });
       // console.log("Booking data before creation:", bookingData);
       const booking = await storage.createBooking(bookingData);
+
+      // Send email notification to Department Approver
+      try {
+        const department = await storage.getDepartment(booking.departmentId);
+        if (department && department.approverId) {
+          const approver = await storage.getUser(department.approverId);
+          if (approver && approver.email) {
+            sendEmail({
+              to: approver.email,
+              subject: `New Booking Request #${booking.id} for ${department.name}`,
+              html: `<h1>New Booking Request</h1>
+                     <p>Dear ${approver.name},</p>
+                     <p>A new booking request #${booking.id} has been submitted for your department, ${department.name}.</p>
+                     <p>Please review the request in the VFast Booker application.</p>`,
+              text: `Dear ${approver.name}, A new booking request #${booking.id} has been submitted for your department, ${department.name}. Please review the request in the VFast Booker application.`,
+            });
+            console.log(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
+          }
+        }
+      } catch (emailError) {
+        console.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
+      }
       res.status(201).json(booking);
     } catch (error) {
       // console.error("Booking creation error:", error);
@@ -469,7 +629,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       try {
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
-          await sendEmail({
+          sendEmail({
             to: bookingUser.email,
             subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
             html: `<h1>Booking Status Update</h1>
@@ -849,14 +1009,34 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         notes: req.body.notes
       });
       
-      const booking = await storage.allocateRoom(allocationData);
+            const booking = await storage.allocateRoom(allocationData);
       
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
+            if (!booking) {
+              return res.status(404).json({ message: "Booking not found" });
+            }
       
-      res.json(booking);
-    } catch (error) {
+            // Send email notification to the booking user
+            try {
+              const bookingUser = await storage.getUser(booking.userId);
+              if (bookingUser && bookingUser.email) {
+                sendEmail({
+                  to: bookingUser.email,
+                  subject: `Your Booking #${booking.id} - Room Allocated!`,
+                  html: `<h1>Room Allocation Confirmation</h1>
+                         <p>Dear ${bookingUser.name},</p>
+                         <p>Your booking request #${booking.id} has been successfully allocated a room.</p>
+                         <p>Room Number: <strong>${booking.roomNumber}</strong></p>
+                         ${booking.notes ? `<p>Notes: ${booking.notes}</p>` : ''}
+                         <p>Thank you for using VFast Booker.</p>`,
+                  text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been successfully allocated a room. Room Number: ${booking.roomNumber}. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
+                });
+                console.log(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
+              }
+            } catch (emailError) {
+              console.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
+            }
+      
+            res.json(booking);    } catch (error) {
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -1073,23 +1253,39 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Upload document for a booking
-  app.post("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), upload.single('file'), async (req, res) => {
+  app.post("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), (req, res, next) => {
+    console.log("Booking document upload route hit!"); // ADD THIS LINE
+    upload.single('file')(req, res, (err: any) => {
+      if (err) {
+        console.error("Multer error:", err);
+        return res.status(400).json({ message: err.message });
+      }
+      next();
+    });
+  }, async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
+      console.log("Parsed bookingId:", bookingId); // ADD THIS LINE
       const file = req.file;
+      console.log("File object from Multer:", file); // ADD THIS LINE
 
       if (!file) {
+        console.error("No file uploaded after Multer processing."); // ADD THIS LINE
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      console.log("Updating booking with documentPath:", file.path); // ADD THIS LINE
       const booking = await storage.updateBooking(bookingId, { documentPath: file.path });
 
       if (!booking) {
+        console.error("Booking not found for ID:", bookingId); // ADD THIS LINE
         return res.status(404).json({ message: "Booking not found" });
       }
 
+      console.log("Booking updated successfully:", booking.id); // ADD THIS LINE
       res.json(booking);
     } catch (error) {
+      console.error("Error in booking document upload (after Multer):", error);
       res.status(500).json({ message: "Failed to upload document" });
     }
   });

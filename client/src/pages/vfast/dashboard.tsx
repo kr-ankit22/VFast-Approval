@@ -81,11 +81,7 @@ export default function VFastDashboard() {
   };
 
   return (
-    <DashboardLayout
-      title="VFast Dashboard"
-      description={`Welcome back, ${user?.name}. Here's an overview of the hostel bookings.`}
-      role={UserRole.VFAST}
-    >
+    <>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -346,6 +342,6 @@ export default function VFastDashboard() {
           </div>
         </TabsContent>
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 }

@@ -162,11 +162,7 @@ export default function BookingRequests() {
   };
 
   return (
-    <DashboardLayout 
-      title="Booking Requests"
-      description="Review and manage all booking requests"
-      role={user?.role}
-    >
+    <>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -323,6 +319,6 @@ export default function BookingRequests() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </DashboardLayout>
+    </>
   );
 }

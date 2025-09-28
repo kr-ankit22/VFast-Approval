@@ -122,28 +122,32 @@ export default function VFastBookingQueue({
             {isLoading ? (
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             ) : (
-              <BookingTable
-                bookings={allocationQueue}
-                renderActions={(booking) => (
-                  <Button variant="outline" size="sm" onClick={() => handleAllocateRoom(booking)}>
-                    Allocate
-                  </Button>
-                )}
-              />
+              <div className="overflow-x-auto">
+                <BookingTable
+                  bookings={allocationQueue}
+                  renderActions={(booking) => (
+                    <Button variant="outline" size="sm" onClick={() => handleAllocateRoom(booking)}>
+                      Allocate
+                    </Button>
+                  )}
+                />
+              </div>
             )}
           </TabsContent>
           <TabsContent value="reconsideration">
             {isLoading ? (
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             ) : (
-              <BookingTable
-                bookings={reconsiderationQueue}
-                renderActions={(booking) => (
-                  <Button variant="outline" size="sm" onClick={() => handleViewBooking(booking)}>
-                    View
-                  </Button>
-                )}
-              />
+              <div className="overflow-x-auto">
+                <BookingTable
+                  bookings={reconsiderationQueue}
+                  renderActions={(booking) => (
+                    <Button variant="outline" size="sm" onClick={() => handleViewBooking(booking)}>
+                      View
+                    </Button>
+                  )}
+                />
+              </div>
             )}
           </TabsContent>
         </Tabs>

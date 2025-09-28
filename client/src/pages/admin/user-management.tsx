@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, UploadCloud, PlusCircle, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Loader2, UploadCloud, PlusCircle, Edit, Trash2, Search, Users, Building2 } from "lucide-react";
 import { User, UserRole } from "@shared/schema";
 import { 
   Table, 
@@ -17,14 +17,6 @@ import {
   TableBody, 
   TableCell 
 } from "@/components/ui/table";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
 import { 
   Dialog, 
   DialogContent, 
@@ -37,6 +29,7 @@ import {
 import { 
   Form, 
   FormControl, 
+  FormDescription, 
   FormField, 
   FormItem, 
   FormLabel, 
@@ -49,11 +42,15 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import { Badge } from "@/components/ui/badge";
+import { useDepartments } from "@/hooks/use-departments";
+import { Combobox } from "@/components/ui/combobox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 // Zod schema for creating/updating a user
 const userFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -61,7 +58,7 @@ const userFormSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
-  department: z.string().optional(), // Assuming department is an ID or string
+  department: z.string({ required_error: "Department is required." }).min(1, "Department is required."),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -71,12 +68,33 @@ export default function UserManagementPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch all users
   const { data: users, isLoading, error } = useQuery<User[]>({ 
     queryKey: ["adminUsers"], 
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/users");
+      return res.json();
+    }
+  });
+
+  // Fetch departments for the combobox
+  const { data: departments, isLoading: isLoadingDepartments } = useDepartments();
+
+  const departmentOptions = departments?.map(dept => ({ value: String(dept.id), label: dept.name })) || [];
+
+  // Create a map for easy lookup in the table
+  const departmentMap = departments?.reduce((acc, dept) => {
+    acc[dept.id] = dept.name;
+    return acc;
+  }, {} as Record<number, string>);
+
+  // Fetch user metrics
+  const { data: userMetrics, isLoading: isLoadingMetrics } = useQuery<{ totalUsers: number; totalDepartments: number }>({ 
+    queryKey: ["userMetrics"], 
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/stats/users");
       return res.json();
     }
   });
@@ -96,6 +114,7 @@ export default function UserManagementPage() {
       });
       setFile(null);
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userMetrics"] });
     },
     onError: (error: any) => {
       toast({
@@ -128,6 +147,7 @@ export default function UserManagementPage() {
       setEditingUser(null);
       userForm.reset();
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userMetrics"] });
     },
     onError: (error: any) => {
       toast({
@@ -149,6 +169,7 @@ export default function UserManagementPage() {
         description: "The user has been successfully deleted.",
       });
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userMetrics"] });
     },
     onError: (error: any) => {
       toast({
@@ -169,14 +190,6 @@ export default function UserManagementPage() {
       phone: "",
       department: "",
     },
-    values: editingUser ? { 
-      name: editingUser.name, 
-      email: editingUser.email, 
-      role: editingUser.role, 
-      phone: editingUser.mobileNumber || "",
-      department: editingUser.department_id?.toString() || "",
-      password: "" // Password should not be pre-filled for security
-    } : undefined,
   });
 
   useEffect(() => {
@@ -224,185 +237,277 @@ export default function UserManagementPage() {
     }
   };
 
-  if (isLoading) return <div>Loading users...</div>;
-  if (error) return <div>Error loading users: {error.message}</div>;
+  const filteredUsers = users?.filter(user => 
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.role.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">User Management</h1>
-        <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingUser(null)}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
-              <DialogDescription>
-                {editingUser ? "Make changes to the user profile here." : "Fill in the details to create a new user account."}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...userForm}>
-              <form onSubmit={userForm.handleSubmit(onUserFormSubmit)} className="space-y-4">
-                <FormField
-                  control={userForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="john.doe@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Object.values(UserRole).map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+91 12345 67890" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department ID (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., 1 for Computer Science" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="submit" disabled={userMutation.isPending}>
-                    {userMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {editingUser ? "Save Changes" : "Create User"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+      {/* Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {isLoadingMetrics ? <Loader2 className="h-5 w-5 animate-spin" /> : userMetrics?.totalUsers ?? 0}
+            </div>
+            <p className="text-xs text-muted-foreground">All registered users</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Departments</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {isLoadingMetrics ? <Loader2 className="h-5 w-5 animate-spin" /> : userMetrics?.totalDepartments ?? 0}
+            </div>
+            <p className="text-xs text-muted-foreground">Departments in the system</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* User Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Existing Users</CardTitle>
-          <CardDescription>Manage user accounts in the system.</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <CardTitle>User Accounts</CardTitle>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-grow md:w-64">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => setEditingUser(null)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md h-[90vh]">
+                  <DialogHeader>
+                    <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
+                    <DialogDescription>
+                      {editingUser ? "Make changes to the user profile here." : "Fill in the details to create a new user account."}
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Users created with a BITS Pilani email can log in via Google. Their Google account will be automatically linked on first Google login.
+                      </p>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="h-full">
+                    <TooltipProvider>
+                      <Form {...userForm}>
+                      <form onSubmit={userForm.handleSubmit(onUserFormSubmit)} className="space-y-4 pr-6">
+                        <FormField
+                          control={userForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="John Doe" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input placeholder="john.doe@example.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="••••••••" {...field} />
+                              </FormControl>
+                              <FormDescription>
+                                {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userForm.control}
+                          name="role"
+                          render={({ field }) => (
+                                                      <FormItem>
+                            <div className="flex items-center space-x-1">
+                                  <FormLabel>Role</FormLabel>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>BOOKING: Standard user, can make booking requests.</p>
+                                      <p>DEPARTMENT_APPROVER: Approves bookings for their department.</p>
+                                      <p>ADMIN: Full administrative access.</p>
+                                      <p>VFAST: Manages rooms, guests, and booking workflows.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                            <FormControl>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.values(UserRole).map((role) => (
+                                    <SelectItem key={role} value={role}>
+                                      {role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userForm.control}
+                          name="department"
+                          render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                                <div className="flex items-center space-x-1">
+                                  <FormLabel>Department</FormLabel>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Every user must be assigned to a department.</p>
+                                      <p>Select the department the user belongs to.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                            <FormControl>
+                              <Combobox
+                                options={departmentOptions}
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Select department..."
+                                searchPlaceholder="Search departments..."
+                                noResultsMessage={isLoadingDepartments ? "Loading..." : "No departments found."}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone (Optional)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="+91 12345 67890" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter className="pt-4">
+                          <Button type="submit" disabled={userMutation.isPending}>
+                            {userMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {editingUser ? "Save Changes" : "Create User"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                    </TooltipProvider>
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {users && users.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Department ID</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="capitalize">{user.role.replace(/_/g, " ")}</TableCell>
-                    <TableCell>{user.mobileNumber || "-"}</TableCell>
-                    <TableCell>{user.department_id || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading users data...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-500">
+              <p>Error loading users: {error.message}</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No users found matching your criteria.</p>
+              {searchTerm && (
+                <p className="mt-2">
+                  Try a different search term or clear the search.
+                  <Button 
+                    variant="link" 
+                    className="ml-1 p-0" 
+                    onClick={() => setSearchTerm("")}
+                  >
+                    Clear search
+                  </Button>
+                </p>
+              )}
+            </div>
           ) : (
-            <p className="text-muted-foreground">No users found. Start by adding one or uploading a CSV.</p>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell><Badge variant="secondary" className="capitalize">{user.role.replace(/_/g, " ")}</Badge></TableCell>
+                      <TableCell>{departmentMap?.[user.department_id] || user.department_id || "-"}</TableCell>
+                      <TableCell>{user.mobileNumber || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.id)} className="text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -415,15 +520,28 @@ export default function UserManagementPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="csv-format-bulk">CSV Format</Label>
+            <div className="flex items-center space-x-1">
+              <Label htmlFor="csv-format-bulk">CSV Format</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Expected columns: `email`, `role`, `department`, `name` (optional), `phone` (optional).</p>
+                  <p>Roles: BOOKING, DEPARTMENT_APPROVER, ADMIN, VFAST.</p>
+                  <p>Department: Mandatory, must be the numerical ID of the department.</p>
+                  <p>Example: `john.doe@bits.ac.in,BOOKING,1,John Doe,+919876543210`</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Input
               id="csv-format-bulk"
-              value="email,role,name,phone,department"
+              value="email,role,department,name,phone"
               readOnly
               className="font-mono bg-muted"
             />
             <p className="text-sm text-muted-foreground">
-              Roles: BOOKING, DEPARTMENT_APPROVER, ADMIN, VFAST. Department should be an ID.
+              The 'department' column is now mandatory for all users and must contain the department ID.
             </p>
           </div>
 
@@ -450,9 +568,18 @@ export default function UserManagementPage() {
           </div>
 
           {file && !uploadMutation.isPending && (
-            <Button onClick={handleCsvUpload} className="w-full">
-              Upload CSV
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleCsvUpload} className="w-full">
+                  Upload CSV
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Uploads the selected CSV file.</p>
+                <p>Existing users (by email) will be updated, new users will be created.</p>
+                <p>Any validation errors in the CSV will be reported.</p>
+              </TooltipContent>
+            </Tooltip>
           )}
         </CardContent>
       </Card>
