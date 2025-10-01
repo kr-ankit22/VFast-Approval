@@ -62,18 +62,46 @@ This system will send transactional emails for key events in the booking lifecyc
     *   Use **Nodemailer**, a robust and widely-used Node.js library for sending emails.
     *   Configure an SMTP transport using credentials stored in the `.env` file (e.g., `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`). This allows flexibility to use services like Gmail, SendGrid, or Mailgun.
 2.  **Core Logic (`server/email.ts`):**
-    *   Create a reusable `sendEmail` function that takes `to`, `subject`, and `html` content as arguments.
+    *   Create a reusable `sendEmail` function that takes `to`, `subject`, `html` content, and `text` content as arguments.
     *   Develop email templates for different notification types.
-3.  **Notification Triggers:**
-    *   **User Registration:** Send a "Welcome to VFast Booker" email upon new user creation (especially via Google OAuth).
-    *   **Booking Status Change:**
-        *   When a booking status changes to `PendingApproval`, `Approved`, `Rejected`, or `Allocated`, trigger an email to the user who created the booking.
-        *   When a booking requires department approval, notify the corresponding approver.
-    *   **Password Reset:** (Future enhancement, but the email foundation will be ready).
+3.  **Notification Triggers & Templates:**
 
-**Error Handling:**
+    *   **Template 1: Welcome Email (New User Registration)**
+        *   **Event:** New User Registration (both local and Google sign-up).
+        *   **Recipient:** The newly registered user.
+        *   **Subject:** `Welcome to VFast Booker!`
+        *   **Content (HTML/Text):** "Welcome, [User Name]! Your account has been successfully created. You can now log in to the VFast Booker application by clicking [here]([FRONTEND_URL]/login)."
+        *   **Affected Modules:** `server/routes.ts` (for local registration), `server/google-auth.ts` (for Google sign-up).
 
-*   **Invalid Email Configuration:** The application will perform a check on startup (`smtpTransport.verify()`) to ensure SMTP credentials are valid. If not, it will log a critical error and fail to start, preventing runtime failures.
-*   **Failed Email Delivery:** The `sendEmail` function will be wrapped in a `try/catch` block.
-    *   If an email fails to send (e.g., invalid recipient address, SMTP service down), the error will be logged with details (`recipient`, `subject`, `error message`).
-    *   The primary application flow (e.g., booking approval) will **not** be blocked. The failure will be logged, but the user action (like approving a booking) will still succeed. This ensures the email system is not a single point of failure for core application logic.
+    *   **Template 2: New Booking Request (to Department Approver)**
+        *   **Event:** When a new booking is created.
+        *   **Recipient:** The relevant Department Approver.
+        *   **Subject:** `New Booking Request #[Booking ID] for [Department Name]`
+        *   **Content (HTML/Text):** "Dear [Approver Name], A new booking request #[Booking ID] has been submitted for your department, [Department Name]. Please review the request in the VFast Booker application by clicking [here]([FRONTEND_URL]/department/requests)."
+        *   **Affected Module:** `server/storage.ts` (within `createBooking`).
+
+    *   **Template 3: Booking Status Update (to Booking User)**
+        *   **Event:** When a booking's status changes (e.g., Approved by Department, Approved by Admin, Rejected).
+        *   **Recipient:** The user who created the booking.
+        *   **Subject:** `Your Booking #[Booking ID] Status Update: [New Status]`
+        *   **Content (HTML/Text):** "Dear [User Name], Your booking request #[Booking ID] has been updated to **[New Status]** by [Approver Role]. [Optional Notes]. You can view details by clicking [here]([FRONTEND_URL]/booking/[Booking ID]). Thank you for using VFast Booker."
+        *   **Affected Module:** `server/storage.ts` (within `updateBookingStatus`).
+
+    *   **Template 4: Room Allocated (to Booking User)**
+        *   **Event:** When a room is allocated to a booking.
+        *   **Recipient:** The user who created the booking.
+        *   **Subject:** `Your Booking #[Booking ID] - Room Allocated!`
+        *   **Content (HTML/Text):** "Dear [User Name], Your booking request #[Booking ID] has been successfully allocated a room. Room Number: **[Room Number]**. [Optional Notes]. You can view details by clicking [here]([FRONTEND_URL]/booking/[Booking ID]). Thank you for using VFast Booker."
+        *   **Affected Module:** `server/storage.ts` (within `allocateRoom`).
+
+**4. Error Handling:**
+
+*   **Strategy:** Email sending failures will be logged but will **not** block the main application flow.
+
+**5. Utilizing Existing Components:**
+
+*   We will leverage the existing `sendEmail` function in `server/email.ts` and the `logger` for error reporting.
+
+---
+
+**Note:** This updated plan for the Email Notification System is the preferred approach.
