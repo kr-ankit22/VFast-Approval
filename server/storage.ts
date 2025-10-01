@@ -378,7 +378,7 @@ export class DatabaseStorage implements IStorage {
     try {
       logger.info({ departmentId }, `Executing query for departmentId`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.department_id, departmentId));
-      logger.info('getBookingsByDepartment result:', result);
+      logger.info({ result }, 'getBookingsByDepartment result');
       return result;
     } catch (error: any) {
       logger.error({ err: error }, "Error in getBookingsByDepartment");

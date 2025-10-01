@@ -53,4 +53,4 @@ To get a local copy up and running, follow these simple steps.
     npm run dev
     ```
 
-The application will be available at `http://localhost:5000`. 
+The application will be available at the URL printed in your console. 
