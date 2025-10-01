@@ -170,6 +170,15 @@ export const adminApprovalSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const updateBookingStatusSchema = z.object({
+  id: z.number(),
+  status: z.nativeEnum(BookingStatus),
+  notes: z.string().optional(),
+  approverId: z.number().optional(),
+});
+
+export type UpdateBookingStatus = z.infer<typeof updateBookingStatusSchema>;
+
 // Room allocation schema
 export const roomAllocationSchema = z.object({
   bookingId: z.number(),

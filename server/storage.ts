@@ -14,7 +14,8 @@ import {
   rooms,
   guests,
   roomMaintenance,
-  guestNotes
+  guestNotes,
+  auditLogs
 } from "@shared/schema";
 import { eq, and, or, lt, gt, lte, gte, sql, inArray } from "drizzle-orm";
 import session from "express-session";
@@ -29,7 +30,7 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
-  getUserByEmail(string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
@@ -122,7 +123,7 @@ export class DatabaseStorage implements IStorage {
       const [user] = await this.dbClient.select().from(users).where(eq(users.id, id));
       return user;
     } catch (error: any) {
-      logger.error(`Error in getUser for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in getUser for ID ${id}`);
       throw new Error("Failed to retrieve user.");
     }
   }
@@ -132,7 +133,7 @@ export class DatabaseStorage implements IStorage {
       const [user] = await this.dbClient.select().from(users).where(eq(users.email, email));
       return user;
     } catch (error: any) {
-      logger.error(`Error in getUserByEmail for email ${email}:`, error);
+      logger.error({ err: error }, `Error in getUserByEmail for email ${email}`);
       throw new Error("Failed to retrieve user by email.");
     }
   }
@@ -145,7 +146,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return user;
     } catch (error: any) {
-      logger.error("Error in createUser:", error);
+      logger.error({ err: error }, "Error in createUser");
       throw new Error("Failed to create user.");
     }
   }
@@ -159,7 +160,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return user;
     } catch (error: any) {
-      logger.error(`Error in updateUser for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in updateUser for ID ${id}`);
       throw new Error("Failed to update user.");
     }
   }
@@ -168,15 +169,24 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(users);
     } catch (error: any) {
-      logger.error("Error in getAllUsers:", error);
+      logger.error({ err: error }, "Error in getAllUsers");
       throw new Error("Failed to retrieve all users.");
+    }
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    try {
+      await this.dbClient.delete(users).where(eq(users.id, id));
+    } catch (error: any) {
+      logger.error({ err: error }, `Error in deleteUser for ID ${id}`);
+      throw new Error("Failed to delete user.");
     }
   }
 
   // Booking Operations
   async getBooking(id: number): Promise<Booking | undefined> {
     try {
-      logger.info("getBooking ID:", id);
+      logger.info({ id }, "getBooking ID");
       const [booking] = await this.dbClient.select({
         id: bookings.id,
         userId: bookings.userId,
@@ -211,7 +221,7 @@ export class DatabaseStorage implements IStorage {
       }).from(bookings).where(eq(bookings.id, id)).leftJoin(departments, eq(bookings.department_id, departments.id));
       return booking;
     } catch (error: any) {
-      logger.error(`Error in getBooking for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in getBooking for ID ${id}`);
       throw new Error("Failed to retrieve booking.");
     }
   }
@@ -250,10 +260,10 @@ export class DatabaseStorage implements IStorage {
         firstCheckedInGuestName: bookings.firstCheckedInGuestName,
         departmentName: departments.name
       }).from(bookings).where(eq(bookings.userId, userId)).leftJoin(departments, eq(bookings.department_id, departments.id));
-      logger.info('getBookingsByUserId result:', result);
+      logger.info({ result }, 'getBookingsByUserId result');
       return result;
     } catch (error: any) {
-      logger.error(`Error in getBookingsByUserId for user ID ${userId}:`, error);
+      logger.error({ err: error }, `Error in getBookingsByUserId for user ID ${userId}`);
       throw new Error("Failed to retrieve user bookings.");
     }
   }
@@ -292,10 +302,10 @@ export class DatabaseStorage implements IStorage {
         firstCheckedInGuestName: bookings.firstCheckedInGuestName,
         departmentName: departments.name
       }).from(bookings).where(and(eq(bookings.userId, userId), eq(bookings.status, status))).leftJoin(departments, eq(bookings.department_id, departments.id));
-      logger.info('getBookingsByUserIdAndStatus result:', result);
+      logger.info({ result }, 'getBookingsByUserIdAndStatus result');
       return result;
     } catch (error: any) {
-      logger.error(`Error in getBookingsByUserIdAndStatus for user ID ${userId} and status ${status}:`, error);
+      logger.error({ err: error }, `Error in getBookingsByUserIdAndStatus for user ID ${userId} and status ${status}`);
       throw new Error("Failed to retrieve user bookings by status.");
     }
   }
@@ -335,43 +345,43 @@ export class DatabaseStorage implements IStorage {
         departmentName: departments.name,
       }).from(bookings).where(eq(bookings.isDeleted, false)).leftJoin(departments, eq(bookings.department_id, departments.id));
     } catch (error: any) {
-      logger.error("Error in getAllBookings:", error);
+      logger.error({ err: error }, "Error in getAllBookings");
       throw new Error("Failed to retrieve all bookings.");
     }
   }
 
   async getBookingsByStatus(status: BookingStatus): Promise<Booking[]> {
     try {
-      logger.info(`Executing query for getBookingsByStatus with status: ${status}`);
+      logger.info({ status }, `Executing query for getBookingsByStatus`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.status, status));
-      logger.info(`getBookingsByStatus for status ${status} found ${result.length} bookings.`);
+      logger.info({ status, count: result.length }, `getBookingsByStatus found bookings`);
       return result;
     } catch (error: any) {
-      logger.error(`Error in getBookingsByStatus for status ${status}:`, error);
+      logger.error({ err: error }, `Error in getBookingsByStatus for status ${status}`);
       throw new Error("Failed to retrieve bookings by status.");
     }
   }
 
   async getBookingsByWorkflowStage(stage: WorkflowStage): Promise<Booking[]> {
     try {
-      logger.info(`Executing query for workflow stage: ${stage}`);
+      logger.info({ stage }, `Executing query for workflow stage`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.currentWorkflowStage, stage));
-      logger.info('getBookingsByWorkflowStage result:', result);
+      logger.info({ result }, 'getBookingsByWorkflowStage result');
       return result;
     } catch (error: any) {
-      logger.error(`Error in getBookingsByWorkflowStage for stage ${stage}:`, error);
+      logger.error({ err: error }, `Error in getBookingsByWorkflowStage for stage ${stage}`);
       throw new Error("Failed to retrieve bookings by workflow stage.");
     }
   }
 
   async getBookingsByDepartment(departmentId: number): Promise<Booking[]> {
     try {
-      logger.info(`Executing query for departmentId: ${departmentId}`);
+      logger.info({ departmentId }, `Executing query for departmentId`);
       const result = await this.dbClient.select().from(bookings).where(eq(bookings.department_id, departmentId));
       logger.info('getBookingsByDepartment result:', result);
       return result;
     } catch (error: any) {
-      logger.error("Error in getBookingsByDepartment:", error);
+      logger.error({ err: error }, "Error in getBookingsByDepartment");
       throw new Error("Failed to retrieve department-specific bookings.");
     }
   }
@@ -384,7 +394,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error: any) {
-      logger.error("Storage: Error in createBooking:", error);
+      logger.error({ err: error }, "Storage: Error in createBooking");
       throw new Error("Failed to create booking.");
     }
   }
@@ -459,7 +469,7 @@ export class DatabaseStorage implements IStorage {
 
       return booking;
     } catch (error: any) {
-      logger.error(`Error in updateBookingStatus for ID ${params.id}:`, error);
+      logger.error({ err: error }, `Error in updateBookingStatus for ID ${params.id}`);
       throw new Error(`Failed to update booking status for booking with ID ${params.id}. Error: ${error.message}`);
     }
   }
@@ -484,7 +494,7 @@ export class DatabaseStorage implements IStorage {
 
       return reconsideredBooking;
     } catch (error: any) {
-      logger.error(`Error in reconsiderBooking for booking ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in reconsiderBooking for booking ID ${bookingId}`);
       throw new Error("Failed to reconsider booking.");
     }
   }
@@ -498,7 +508,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error: any) {
-      logger.error(`Error in updateBooking for ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in updateBooking for ID ${bookingId}`);
       throw new Error("Failed to update booking.");
     }
   }
@@ -592,7 +602,7 @@ export class DatabaseStorage implements IStorage {
   
         return journey;
       } catch (error: any) {
-        logger.error(`Error in getBookingJourney for booking ID ${bookingId}:`, error);
+        logger.error({ err: error }, `Error in getBookingJourney for booking ID ${bookingId}`);
         throw new Error("Failed to retrieve booking journey.");
       }
     }
@@ -609,7 +619,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return booking;
     } catch (error: any) {
-      logger.error(`Error in updateBookingWorkflowStage for ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in updateBookingWorkflowStage for ID ${bookingId}`);
       throw new Error("Failed to update booking workflow stage.");
     }
   }
@@ -660,7 +670,7 @@ export class DatabaseStorage implements IStorage {
         client.release();
       }
     } catch (error: any) {
-      logger.error(`Error in updateBookingCheckInStatus for ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in updateBookingCheckInStatus for ID ${bookingId}`);
       throw new Error("Failed to update booking check-in status.");
     }
   }
@@ -771,7 +781,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return guest;
     } catch (error: any) {
-      logger.error("Error in createGuest:", error);
+      logger.error({ err: error }, "Error in createGuest");
       throw new Error("Failed to create guest.");
     }
   }
@@ -781,7 +791,7 @@ export class DatabaseStorage implements IStorage {
       const [guest] = await this.dbClient.select().from(guests).where(eq(guests.id, guestId));
       return guest;
     } catch (error: any) {
-      logger.error(`Error in getGuest for ID ${guestId}:`, error);
+      logger.error({ err: error }, `Error in getGuest for ID ${guestId}`);
       throw new Error("Failed to retrieve guest.");
     }
   }
@@ -811,7 +821,7 @@ export class DatabaseStorage implements IStorage {
         otherNationality: guests.otherNationality,
       }).from(guests).where(eq(guests.bookingId, bookingId));
     } catch (error: any) {
-      logger.error(`Error in getGuestsByBookingId for booking ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in getGuestsByBookingId for booking ID ${bookingId}`);
       throw new Error("Failed to retrieve guests for booking.");
     }
   }
@@ -825,7 +835,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return guest;
     } catch (error: any) {
-      logger.error(`Error in updateGuest for ID ${guestId}:`, error);
+      logger.error({ err: error }, `Error in updateGuest for ID ${guestId}`);
       throw new Error("Failed to update guest.");
     }
   }
@@ -834,7 +844,7 @@ export class DatabaseStorage implements IStorage {
     try {
       await this.dbClient.delete(guests).where(eq(guests.id, guestId));
     } catch (error: any) {
-      logger.error(`Error in deleteGuest for ID ${guestId}:`, error);
+      logger.error({ err: error }, `Error in deleteGuest for ID ${guestId}`);
       throw new Error("Failed to delete guest.");
     }
   }
@@ -879,7 +889,7 @@ export class DatabaseStorage implements IStorage {
       return booking;
     } catch (error: any) {
       await client.query('ROLLBACK');
-      logger.error(`Error in checkOutAllGuests for booking ID ${bookingId}:`, error);
+      logger.error({ err: error }, `Error in checkOutAllGuests for booking ID ${bookingId}`);
       throw new Error("Failed to check out all guests.");
     } finally {
       client.release();
@@ -895,7 +905,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return note;
     } catch (error: any) {
-      logger.error("Error in createGuestNote:", error);
+      logger.error({ err: error }, "Error in createGuestNote");
       throw new Error("Failed to create guest note.");
     }
   }
@@ -904,7 +914,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(guestNotes).where(eq(guestNotes.guestId, guestId)).orderBy(guestNotes.timestamp);
     } catch (error: any) {
-      logger.error(`Error in getGuestNotesByGuestId for guest ID ${guestId}:`, error);
+      logger.error({ err: error }, `Error in getGuestNotesByGuestId for guest ID ${guestId}`);
       throw new Error("Failed to retrieve guest notes.");
     }
   }
@@ -917,7 +927,7 @@ export class DatabaseStorage implements IStorage {
       const [room] = await this.dbClient.select().from(rooms).where(eq(rooms.id, id));
       return room;
     } catch (error: any) {
-      logger.error(`Error in getRoom for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in getRoom for ID ${id}`);
       throw new Error("Failed to retrieve room.");
     }
   }
@@ -927,7 +937,7 @@ export class DatabaseStorage implements IStorage {
       const [room] = await this.dbClient.select().from(rooms).where(eq(rooms.roomNumber, roomNumber));
       return room;
     } catch (error: any) {
-      logger.error(`Error in getRoomByNumber for room number ${roomNumber}:`, error);
+      logger.error({ err: error }, `Error in getRoomByNumber for room number ${roomNumber}`);
       throw new Error("Failed to retrieve room by number.");
     }
   }
@@ -947,7 +957,7 @@ export class DatabaseStorage implements IStorage {
         reservedByName: users.name
       }).from(rooms).leftJoin(users, eq(rooms.reservedBy, users.id));
     } catch (error: any) {
-      logger.error("Error in getAllRooms:", error);
+      logger.error({ err: error }, "Error in getAllRooms");
       throw new Error("Failed to retrieve all rooms.");
     }
   }
@@ -964,7 +974,7 @@ export class DatabaseStorage implements IStorage {
           )
         );
     } catch (error: any) {
-      logger.error(`Error in getAvailableRoomsByType for type ${type}:`, error);
+      logger.error({ err: error }, `Error in getAvailableRoomsByType for type ${type}`);
       throw new Error("Failed to retrieve available rooms by type.");
     }
   }
@@ -978,7 +988,7 @@ export class DatabaseStorage implements IStorage {
       logger.info("getAllAvailableRooms result:", availableRooms);
       return availableRooms;
     } catch (error: any) {
-      logger.error("Error in getAllAvailableRooms:", error);
+      logger.error({ err: error }, "Error in getAllAvailableRooms");
       throw new Error("Failed to retrieve all available rooms.");
     }
   }
@@ -1033,7 +1043,7 @@ export class DatabaseStorage implements IStorage {
 
       return result;
     } catch (error: any) {
-      logger.error("Error in getAllocatedBookings:", error);
+      logger.error({ err: error }, "Error in getAllocatedBookings");
       throw new Error("Failed to retrieve allocated bookings.");
     }
   }
@@ -1046,7 +1056,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return room;
     } catch (error: any) {
-      logger.error("Error in createRoom:", error);
+      logger.error({ err: error }, "Error in createRoom");
       throw new Error("Failed to create room.");
     }
   }
@@ -1080,7 +1090,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return room;
     } catch (error: any) {
-      logger.error(`Error in updateRoomStatus for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in updateRoomStatus for ID ${id}`);
       throw new Error("Failed to update room status.");
     }
   }
@@ -1102,7 +1112,7 @@ export class DatabaseStorage implements IStorage {
 
       return maintenance;
     } catch (error: any) {
-      logger.error("Error in createRoomMaintenance:", error);
+      logger.error({ err: error }, "Error in createRoomMaintenance");
       throw new Error("Failed to create room maintenance entry.");
     }
   }
@@ -1129,7 +1139,7 @@ export class DatabaseStorage implements IStorage {
 
       return maintenance;
     } catch (error: any) {
-      logger.error(`Error in updateRoomMaintenanceStatus for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in updateRoomMaintenanceStatus for ID ${id}`);
       throw new Error("Failed to update room maintenance status.");
     }
   }
@@ -1138,7 +1148,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(roomMaintenance).where(eq(roomMaintenance.roomId, roomId));
     } catch (error: any) {
-      logger.error(`Error in getRoomMaintenanceByRoomId for room ID ${roomId}:`, error);
+      logger.error({ err: error }, `Error in getRoomMaintenanceByRoomId for room ID ${roomId}`);
       throw new Error("Failed to retrieve room maintenance entries.");
     }
   }
@@ -1147,7 +1157,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(roomMaintenance).where(eq(roomMaintenance.status, RoomMaintenanceStatus.IN_PROGRESS));
     } catch (error: any) {
-      logger.error("Error in getActiveRoomMaintenance:", error);
+      logger.error({ err: error }, "Error in getActiveRoomMaintenance");
       throw new Error("Failed to retrieve active room maintenance entries.");
     }
   }
@@ -1157,7 +1167,7 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.dbClient.select().from(departments);
     } catch (error: any) {
-      logger.error("Error in getAllDepartments:", error);
+      logger.error({ err: error }, "Error in getAllDepartments");
       throw new Error("Failed to retrieve all departments.");
     }
   }
@@ -1167,7 +1177,7 @@ export class DatabaseStorage implements IStorage {
       const [department] = await this.dbClient.select().from(departments).where(eq(departments.id, id));
       return department;
     } catch (error: any) {
-      logger.error(`Error in getDepartment for ID ${id}:`, error);
+      logger.error({ err: error }, `Error in getDepartment for ID ${id}`);
       throw new Error("Failed to retrieve department.");
     }
   }
@@ -1187,7 +1197,7 @@ export class DatabaseStorage implements IStorage {
 
       return stats;
     } catch (error: any) {
-      logger.error("Error in getVFastAllocationStats:", error);
+      logger.error({ err: error }, "Error in getVFastAllocationStats");
       throw new Error("Failed to retrieve VFast allocation stats.");
     }
   }
@@ -1197,7 +1207,7 @@ export class DatabaseStorage implements IStorage {
       const [result] = await this.dbClient.select({ count: sql<number>`count(*)` }).from(users);
       return result.count;
     } catch (error: any) {
-      logger.error("Error in getTotalUsers:", error);
+      logger.error({ err: error }, "Error in getTotalUsers");
       throw new Error("Failed to retrieve total users count.");
     }
   }
@@ -1207,7 +1217,7 @@ export class DatabaseStorage implements IStorage {
       const [result] = await this.dbClient.select({ count: sql<number>`count(*)` }).from(departments);
       return result.count;
     } catch (error: any) {
-      logger.error("Error in getTotalDepartments:", error);
+      logger.error({ err: error }, "Error in getTotalDepartments");
       throw new Error("Failed to retrieve total departments count.");
     }
   }
@@ -1217,7 +1227,7 @@ export class DatabaseStorage implements IStorage {
     try {
       await this.dbClient.insert(auditLogs).values({ tableName, recordId, action, userId, details });
     } catch (error: any) {
-      logger.error("Error in createAuditLog:", error);
+      logger.error({ err: error }, "Error in createAuditLog");
       // Do not re-throw the error, as audit logging should not block the main operation
     }
   }
