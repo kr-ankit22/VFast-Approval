@@ -4,6 +4,10 @@ import bcrypt from 'bcrypt';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import logger from './logger';
+import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
+
+logger.info("server/auth.ts: Initializing Passport strategies.");
 
 // Local Strategy
 passport.use(
@@ -34,6 +38,36 @@ passport.use(
   })
 );
 
+// JWT Strategy
+const jwtOptions = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET,
+};
+
+logger.info("JWT Strategy: Using secretOrKey:", jwtOptions.secretOrKey ? "[SECRET_PRESENT]" : "[SECRET_MISSING]");
+
+passport.use(
+  new JwtStrategy(jwtOptions, async (payload, done) => {
+    logger.info("JWT Strategy: Payload received:", payload);
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, payload.id),
+      });
+
+      if (user) {
+        logger.info("JWT Strategy: User found:", user.id);
+        return done(null, user);
+      } else {
+        logger.warn("JWT Strategy: User not found for payload:", payload);
+        return done(null, false);
+      }
+    } catch (error) {
+      logger.error("JWT Strategy: Error during user lookup:", error);
+      return done(error, false);
+    }
+  })
+);
+
 // Serialize user into the session
 passport.serializeUser((user: any, done) => {
 
@@ -50,9 +84,11 @@ passport.deserializeUser(async (id: string, done) => {
 
     done(null, user);
   } catch (error) {
-    console.error("Passport: Error deserializing user:", error);
+    logger.error("Passport: Error deserializing user:", error);
     done(error, undefined);
   }
 });
+
+export const authenticateJwt = passport.authenticate('jwt', { session: false });
 
 export default passport;

@@ -264,3 +264,14 @@ export const guestNotes = pgTable("guest_notes", {
 
 export type GuestNote = typeof guestNotes.$inferSelect;
 export type InsertGuestNote = typeof guestNotes.$inferInsert;
+
+// Audit Logs table
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  tableName: text("table_name").notNull(),
+  recordId: text("record_id").notNull(),
+  action: text("action").notNull(),
+  userId: text("user_id"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  details: text("details"),
+});

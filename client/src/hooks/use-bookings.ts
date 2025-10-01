@@ -2,10 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Booking, UpdateBookingStatus, RoomAllocation, Department } from "@shared/schema";
 
 const fetchBookings = async (): Promise<Booking[]> => {
-  const response = await fetch("/api/bookings");
-  if (!response.ok) {
-    throw new Error("Failed to fetch bookings");
-  }
+  const response = await apiRequest("GET", "/api/bookings");
   return response.json();
 };
 
@@ -17,10 +14,7 @@ export const useGetBookings = () => {
 };
 
 const fetchMyBookings = async (): Promise<Booking[]> => {
-  const response = await fetch("/api/my-bookings");
-  if (!response.ok) {
-    throw new Error("Failed to fetch my bookings");
-  }
+  const response = await apiRequest("GET", "/api/my-bookings");
   return response.json();
 };
 
@@ -33,10 +27,7 @@ export const useGetMyBookings = () => {
 
 
 const fetchDepartmentApprovals = async (): Promise<Booking[]> => {
-  const response = await fetch("/api/department-approvals");
-  if (!response.ok) {
-    throw new Error("Failed to fetch department approvals");
-  }
+  const response = await apiRequest("GET", "/api/department-approvals");
   const data = await response.json();
   // console.log("Raw response from /api/department-approvals:", data);
   return data;
@@ -54,16 +45,7 @@ export const useDepartmentApprovals = () => {
 };
 
 const updateBookingStatus = async (data: UpdateBookingStatus): Promise<Booking> => {
-  const response = await fetch(`/api/bookings/${data.id}/department-approval`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to update booking status");
-  }
+  const response = await apiRequest("PATCH", `/api/bookings/${data.id}/department-approval`, data);
   return response.json();
 };
 
@@ -84,16 +66,7 @@ export const useUpdateBookingStatus = () => {
 };
 
 const allocateRoom = async (data: RoomAllocation): Promise<Booking> => {
-  const response = await fetch(`/api/bookings/${data.bookingId}/allocate`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to allocate room");
-  }
+  const response = await apiRequest("PATCH", `/api/bookings/${data.bookingId}/allocate`, data);
   return response.json();
 };
 
@@ -110,10 +83,7 @@ export const useAllocateRoom = () => {
 };
 
 const fetchReconsiderationBookings = async (): Promise<Booking[]> => {
-  const response = await fetch("/api/bookings/reconsideration");
-  if (!response.ok) {
-    throw new Error("Failed to fetch reconsideration bookings");
-  }
+  const response = await apiRequest("GET", "/api/bookings/reconsideration");
   return response.json();
 };
 
@@ -125,10 +95,7 @@ export const useGetReconsiderationBookings = () => {
 };
 
 const fetchDepartments = async (): Promise<Department[]> => {
-  const response = await fetch("/api/departments");
-  if (!response.ok) {
-    throw new Error("Failed to fetch departments");
-  }
+  const response = await apiRequest("GET", "/api/departments");
   return response.json();
 };
 
@@ -140,16 +107,7 @@ export const useGetDepartments = () => {
 };
 
 const resubmitBooking = async (data: { id: number, booking: Booking }): Promise<Booking> => {
-  const response = await fetch(`/api/bookings/${data.id}/resubmit`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data.booking),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to resubmit booking");
-  }
+  const response = await apiRequest("POST", `/api/bookings/${data.id}/resubmit`, data.booking);
   return response.json();
 };
 
@@ -166,10 +124,7 @@ export const useResubmitBooking = () => {
 };
 
 const fetchMyReconsiderationBookings = async (): Promise<Booking[]> => {
-  const response = await fetch("/api/my-bookings/reconsider");
-  if (!response.ok) {
-    throw new Error("Failed to fetch my reconsideration bookings");
-  }
+  const response = await apiRequest("GET", "/api/my-bookings/reconsider");
   return response.json();
 };
 
@@ -181,10 +136,7 @@ export const useGetMyReconsiderationBookings = () => {
 };
 
 const fetchRooms = async (): Promise<Room[]> => {
-  const response = await fetch("/api/rooms");
-  if (!response.ok) {
-    throw new Error("Failed to fetch rooms");
-  }
+  const response = await apiRequest("GET", "/api/rooms");
   return response.json();
 };
 
@@ -195,11 +147,11 @@ export const useGetRooms = () => {
   });
 };
 
+import { apiRequest } from "../lib/queryClient";
+
 const fetchGuestWorklist = async (): Promise<any[]> => {
-  const response = await fetch("/api/bookings/worklist");
-  if (!response.ok) {
-    throw new Error("Failed to fetch guest worklist");
-  }
+  console.log("fetchGuestWorklist: Token from localStorage:", localStorage.getItem("token"));
+  const response = await apiRequest("GET", "/api/bookings/worklist");
   const data = await response.json();
   console.log("Guest worklist data:", data);
   return data;
@@ -213,12 +165,7 @@ export const useGetGuestWorklist = () => {
 };
 
 const checkInBooking = async (bookingId: number): Promise<Booking> => {
-  const response = await fetch(`/api/bookings/${bookingId}/check-in`, {
-    method: "PATCH",
-  });
-  if (!response.ok) {
-    throw new Error("Failed to check-in booking");
-  }
+  const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/check-in`);
   return response.json();
 };
 
@@ -234,12 +181,7 @@ export const useCheckInBooking = () => {
 };
 
 const checkOutBooking = async (bookingId: number): Promise<Booking> => {
-  const response = await fetch(`/api/bookings/${bookingId}/check-out`, {
-    method: "PATCH",
-  });
-  if (!response.ok) {
-    throw new Error("Failed to check-out booking");
-  }
+  const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/check-out`);
   return response.json();
 };
 

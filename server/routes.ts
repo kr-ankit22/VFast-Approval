@@ -18,8 +18,11 @@ import { z, ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import fs from 'fs/promises';
 import Papa from 'papaparse';
-
 import upload from './upload';
+import logger from './logger';
+import { authenticateJwt } from "./auth";
+
+import jwt from 'jsonwebtoken';
 
 // Zod schemas for validation
 const loginSchema = z.object({
@@ -39,15 +42,16 @@ const registerSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+
+
 // Middleware to check user role
 const checkRole = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: Function) => {
-    // console.log("Checking role for user:", req.user);
-    if (!req.isAuthenticated()) {
+    if (!req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    if (!roles.includes(req.user.role as UserRole)) {
+    if (!roles.includes((req.user as any).role as UserRole)) {
       return res.status(403).json({ message: "Not authorized" });
     }
     
@@ -57,7 +61,7 @@ const checkRole = (roles: UserRole[]) => {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<void> {
   app.get("/test", (req, res) => {
-    console.log("Test route hit!");
+    logger.info("Test route hit!");
     res.send("Test successful!");
   });
 
@@ -71,21 +75,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     (req, res, next) => {
       passport.authenticate("google", (err, user, info) => {
         if (err) {
-          console.error("Google Auth Error:", err);
+          logger.error("Google Auth Error:", err);
           return res.redirect("/login?error=" + encodeURIComponent(err.message));
         }
         if (!user) {
-          console.log("Google Auth Failed - No user:", info);
+          logger.warn("Google Auth Failed - No user:", info);
           return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
         }
-        req.logIn(user, (loginErr) => {
-          if (loginErr) {
-            console.error("Google Login: req.logIn failed with error:", loginErr);
-            return res.redirect("/login?error=" + encodeURIComponent(loginErr.message));
-          }
-          console.log("Google Login: req.logIn successful. Redirecting to /.");
-          res.redirect("/");
-        });
+        const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+        logger.info("Google Login: Token generated. Redirecting to /.");
+        res.redirect(`/?token=${token}`);
       })(req, res, next);
     }
   );
@@ -114,7 +113,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       // Log the user in after successful registration
       req.login(newUser, async (err) => {
         if (err) {
-          console.error("Error logging in after registration:", err);
+          logger.error("Error logging in after registration:", err);
           return res.status(500).json({ message: "Failed to log in after registration." });
         }
 
@@ -126,9 +125,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
             text: `Welcome, ${newUser.name}! Your account has been successfully created. You can now log in to the VFast Booker application.`,
           });
-          console.log(`Welcome email sent to ${newUser.email}`);
+          logger.info(`Welcome email sent to ${newUser.email}`);
         } catch (emailError) {
-          console.error(`Failed to send welcome email to ${newUser.email}:`, emailError);
+          logger.error(`Failed to send welcome email to ${newUser.email}:`, emailError);
           // Continue even if email fails, as user account is created
         }
 
@@ -139,39 +138,48 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      console.error("Registration error:", error);
+      logger.error("Registration error:", error);
       res.status(500).json({ message: "Failed to register user." });
     }
   });
 
   // Local Login Route
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", { session: false }, (err: any, user: any, info: any) => {
       if (err) { return next(err); }
       if (!user) { return res.status(401).json({ message: info.message }); }
-      req.login(user, (err) => {
-        if (err) { return next(err); }
-        return res.json(user);
-      });
+      const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+      return res.json({ user, token });
     })(req, res, next);
   });
 
   // Logout Route
-  app.post("/api/logout", (req, res, next) => {
+  app.post("/api/logout", (req, res) => {
+    // For JWT-based authentication, logout is primarily handled client-side by removing the token.
+    // The server doesn't maintain sessions for JWTs, so no server-side session destruction is strictly necessary.
+    // However, if session middleware is still active, we can clear it for completeness.
     req.logout((err) => {
-      if (err) { return next(err); }
-      req.session.destroy((err) => {
-        if (err) { return next(err); }
-        res.clearCookie('connect.sid'); // Clear session cookie
+      if (err) {
+        logger.error("Logout error:", err);
+        return res.status(500).json({ message: "Failed to log out." });
+      }
+      if (req.session) {
+        req.session.destroy((err) => {
+          if (err) {
+            logger.error("Session destruction error:", err);
+            return res.status(500).json({ message: "Failed to destroy session." });
+          }
+          res.clearCookie('connect.sid'); // Clear session cookie
+          res.status(200).json({ message: "Logged out successfully" });
+        });
+      } else {
         res.status(200).json({ message: "Logged out successfully" });
-      });
+      }
     });
   });
 
-  app.get("/api/users/me", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
+  app.get("/api/users/me", passport.authenticate('jwt', { session: false }), (req, res) => {
+    logger.info("Backend: /api/users/me - Sending user data:", req.user);
     res.json(req.user);
   });
 
@@ -263,30 +271,30 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Admin User Management Endpoints
 
   // Get all users (Admin only)
-  app.get("/api/admin/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.get("/api/admin/users", async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      console.error("Error fetching all users:", error);
+      logger.error("Error fetching all users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
   // Get user and department stats (Admin only)
-  app.get("/api/admin/stats/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.get("/api/admin/stats/users", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const totalUsers = await storage.getTotalUsers();
       const totalDepartments = await storage.getTotalDepartments();
       res.json({ totalUsers, totalDepartments });
     } catch (error) {
-      console.error("Error fetching user stats:", error);
+      logger.error("Error fetching user stats:", error);
       res.status(500).json({ message: "Failed to fetch user stats" });
     }
   });
 
   // Create a new user (Admin only)
-  app.post("/api/admin/users", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.post("/api/admin/users", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const { name, email, password, role, phone, department } = registerSchema.parse(req.body);
 
@@ -312,13 +320,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      console.error("Error creating user:", error);
+      logger.error("Error creating user:", error);
       res.status(500).json({ message: "Failed to create user." });
     }
   });
 
   // Update a user (Admin only)
-  app.patch("/api/admin/users/:id", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.patch("/api/admin/users/:id", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const updates = req.body;
@@ -340,39 +348,40 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      console.error("Error updating user:", error);
+      logger.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user." });
     }
   });
 
   // Delete a user (Admin only)
-  app.delete("/api/admin/users/:id", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.delete("/api/admin/users/:id", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       await storage.deleteUser(userId);
       res.status(204).send(); // No content
     } catch (error) {
-      console.error("Error deleting user:", error);
+      logger.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user." });
     }
   });
 
   // Get guest worklist (VFast users)
-  app.get("/api/bookings/worklist", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/bookings/worklist", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookings = await storage.getAllocatedBookings();
       res.json(bookings);
     } catch (error) {
-      console.error("Error in /api/bookings/worklist:", error);
+      logger.error("Error in /api/bookings/worklist:", error);
       res.status(500).json({ message: "Failed to fetch guest worklist" });
     }
   });
 
-  app.get("/api/stats/vfast-allocation", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/stats/vfast-allocation", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const stats = await storage.getVFastAllocationStats();
       res.json(stats);
     } catch (error: any) {
+      logger.error("Failed to fetch VFast allocation stats", { error: error.message });
       res.status(500).json({ message: "Failed to fetch VFast allocation stats", error: error.message });
     }
   });
@@ -380,7 +389,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Bookings API
   
   // Get all bookings (Admin & VFast users)
-  app.get("/api/bookings", checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
+  app.get("/api/bookings", authenticateJwt, checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
     try {
       const status = req.query.status as BookingStatus | undefined;
       const workflowStage = req.query.workflowStage as WorkflowStage | undefined;
@@ -401,7 +410,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get user's bookings (Booking users)
-  app.get("/api/my-bookings", checkRole([UserRole.BOOKING]), async (req, res) => {
+  app.get("/api/my-bookings", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -423,7 +432,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get user's bookings for reconsideration (Booking users)
-  app.get("/api/my-bookings/reconsider", checkRole([UserRole.BOOKING]), async (req, res) => {
+  app.get("/api/my-bookings/reconsider", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -476,7 +485,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get pending department approvals
-  app.get("/api/department-approvals", checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
+  app.get("/api/department-approvals", authenticateJwt, checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
     try {
       // console.log("GET /api/department-approvals - req.user:", req.user);
       if (!req.user) {
@@ -494,10 +503,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Update booking status (Department Approver)
-  app.patch("/api/bookings/:id/department-approval", checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
+  app.patch("/api/bookings/:id/department-approval", authenticateJwt, checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
     try {
-      console.log(`[BACKEND] Received department approval request for booking ID: ${req.params.id}`); // ADD THIS LINE
-      console.log("[BACKEND] Request body:", req.body); // ADD THIS LINE
+      logger.info(`[BACKEND] Received department approval request for booking ID: ${req.params.id}`);
+      logger.info("[BACKEND] Request body:", req.body);
 
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -506,13 +515,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
 
-      console.log(`[BACKEND] Status received from frontend: "${status}"`); // ADD THIS LINE
-      console.log(`[BACKEND] Comparing with BookingStatus.APPROVED: "${BookingStatus.APPROVED}"`); // ADD THIS LINE
-      console.log(`[BACKEND] Comparing with BookingStatus.REJECTED: "${BookingStatus.REJECTED}"`); // ADD THIS LINE
-      console.log(`[BACKEND] Is status === BookingStatus.APPROVED? ${status === BookingStatus.APPROVED}`); // ADD THIS LINE
-      console.log(`[BACKEND] Is status === BookingStatus.REJECTED? ${status === BookingStatus.REJECTED}`); // ADD THIS LINE
+      logger.info(`[BACKEND] Status received from frontend: "${status}"`);
+      logger.info(`[BACKEND] Comparing with BookingStatus.APPROVED: "${BookingStatus.APPROVED}"`);
+      logger.info(`[BACKEND] Comparing with BookingStatus.REJECTED: "${BookingStatus.REJECTED}"`);
+      logger.info(`[BACKEND] Is status === BookingStatus.APPROVED? ${status === BookingStatus.APPROVED}`);
+      logger.info(`[BACKEND] Is status === BookingStatus.REJECTED? ${status === BookingStatus.REJECTED}`);
 
-      console.log(`[BACKEND] Calling updateBookingStatus with status: ${status}`);
+      logger.info(`[BACKEND] Calling updateBookingStatus with status: ${status}`);
 
       if (status !== BookingStatus.APPROVED && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
@@ -527,7 +536,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       }, req.user.role as UserRole);
 
       if (!booking) {
-        console.log(`[BACKEND] Booking ${bookingId} not found.`);
+        logger.warn(`[BACKEND] Booking ${bookingId} not found.`);
         return res.status(404).json({ message: "Booking not found" });
       }
 
@@ -541,28 +550,28 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             html: `<h1>Booking Status Update</h1>\r\n                   <p>Dear ${bookingUser.name},</p>\r\n                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>\r\n                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}\r\n                   <p>Thank you for using VFast Booker.</p>`,
             text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by the Department Approver. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
           });
-          console.log(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
+          logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        console.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
       }
 
-      console.log(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
+      logger.info(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
       res.json(booking);
     } catch (error) {
-      console.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error); // ADD THIS LINE
+      logger.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error);
       res.status(500).json({ message: "Failed to update booking status" });
     }
   });
 
   // Create a new booking (Booking users)
-  app.post("/api/bookings", checkRole([UserRole.BOOKING]), async (req, res) => {
+  app.post("/api/bookings", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
     
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      console.log(req.body);
+      logger.info(req.body);
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
@@ -570,7 +579,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
       });
-      // console.log("Booking data before creation:", bookingData);
+      logger.info("Booking data before creation:", bookingData);
       const booking = await storage.createBooking(bookingData);
 
       // Send email notification to Department Approver
@@ -588,15 +597,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                      <p>Please review the request in the VFast Booker application.</p>`,
               text: `Dear ${approver.name}, A new booking request #${booking.id} has been submitted for your department, ${department.name}. Please review the request in the VFast Booker application.`,
             });
-            console.log(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
+            logger.info(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
           }
         }
       } catch (emailError) {
-        console.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
+        logger.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
       }
       res.status(201).json(booking);
     } catch (error) {
-      // console.error("Booking creation error:", error);
+      logger.error("Booking creation error:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -606,7 +615,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Update booking status (Admin users)
-  app.patch("/api/bookings/:id/status", checkRole([UserRole.ADMIN]), async (req, res) => {
+  app.patch("/api/bookings/:id/status", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const statusData = adminApprovalSchema.parse(req.body);
@@ -639,15 +648,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                    <p>Thank you for using VFast Booker.</p>`,
             text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by an Administrator. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
           });
-          console.log(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
+          logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        console.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
       }
       
       res.json(booking);
     } catch (error) {
-      console.error("Error updating booking status:", error);
+      logger.error("Error updating booking status:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -659,7 +668,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     
 
   // Resubmit booking (Booking users)
-  app.post("/api/bookings/:id/resubmit", checkRole([UserRole.BOOKING]), async (req, res) => {
+  app.post("/api/bookings/:id/resubmit", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -703,7 +712,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Guest Management Endpoints
 
   // Add a guest to a booking
-  app.post("/api/bookings/:bookingId/guests", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/bookings/:bookingId/guests", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     console.log('GUEST BODY', req.body)
     try {
       const bookingId = parseInt(req.params.bookingId);
@@ -751,7 +760,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get all guests for a booking
-  app.get("/api/bookings/:bookingId/guests", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/bookings/:bookingId/guests", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
       const guests = await storage.getGuestsByBookingId(bookingId);
@@ -762,7 +771,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Update guest details (including KYC verification and check-in/out)
-  app.patch("/api/guests/:guestId", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/guests/:guestId", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const updates = req.body;
@@ -780,7 +789,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Delete a guest
-  app.delete("/api/guests/:guestId", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.delete("/api/guests/:guestId", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       await storage.deleteGuest(guestId);
@@ -791,7 +800,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Upload document for a guest
-  app.post("/api/guests/:guestId/document", checkRole([UserRole.VFAST]), upload.single('file'), async (req, res) => {
+  app.post("/api/guests/:guestId/document", authenticateJwt, checkRole([UserRole.VFAST]), upload.single('file'), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const file = req.file;
@@ -813,7 +822,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Delete document for a guest
-  app.delete("/api/guests/:guestId/document", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.delete("/api/guests/:guestId/document", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const guest = await storage.getGuest(guestId);
@@ -835,7 +844,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Check-in a guest
-  app.post("/api/guests/:guestId/check-in", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/guests/:guestId/check-in", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const guest = await storage.updateGuest(guestId, { checkedIn: true, checkInTime: new Date() });
@@ -848,21 +857,21 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (booking && !booking.firstCheckedInGuestName) {
         // If firstCheckedInGuestName is not set, update it with the current guest's name
         await storage.updateBooking(guest.bookingId, { firstCheckedInGuestName: guest.name });
-        console.log(`Updated booking ${guest.bookingId} with firstCheckedInGuestName: ${guest.name}`); // ADD THIS LINE
+        logger.info(`Updated booking ${guest.bookingId} with firstCheckedInGuestName: ${guest.name}`);
       } else if (booking) {
-        console.log(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`); // ADD THIS LINE
+        logger.info(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`);
       }
       
       await storage.updateBooking(guest.bookingId, { keyHandedOver: true });
       res.json(guest);
     } catch (error) {
-      console.error("Error in /api/guests/:guestId/check-in:", error); // ADD THIS LINE
+      logger.error("Error in /api/guests/:guestId/check-in:", error);
       res.status(500).json({ message: "Failed to check-in guest" });
     }
   });
 
   // Check-out a guest
-  app.post("/api/guests/:guestId/check-out", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/guests/:guestId/check-out", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const { keyHandedOver } = req.body; // Expect keyHandedOver status (e.g., key received)
@@ -877,7 +886,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Upload KYC document
-  app.post("/api/guests/:guestId/kyc", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/guests/:guestId/kyc", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const { kycDocumentUrl } = req.body;
@@ -892,7 +901,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Upload a generic document for a guest
-  app.post("/api/guests/:guestId/documents", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/guests/:guestId/documents", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const { documentType, documentUrl } = req.body; // documentUrl will come from frontend after upload
@@ -913,7 +922,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Guest Notes Endpoints
 
   // Add a note to a guest
-  app.post("/api/guests/:guestId/notes", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/guests/:guestId/notes", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const { note, type } = req.body;
@@ -932,7 +941,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get all notes for a guest
-  app.get("/api/guests/:guestId/notes", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/guests/:guestId/notes", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const guestId = parseInt(req.params.guestId);
       const notes = await storage.getGuestNotesByGuestId(guestId);
@@ -945,7 +954,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Booking Workflow Endpoints
 
   // Update booking workflow stage
-  app.patch("/api/bookings/:id/workflow-stage", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/bookings/:id/workflow-stage", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const { stage, checkInStatus } = req.body;
@@ -971,7 +980,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Check-in a booking (update booking's overall check-in status)
-  app.patch("/api/bookings/:id/check-in", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/bookings/:id/check-in", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const booking = await storage.updateBookingCheckInStatus(bookingId, GuestCheckInStatus.CHECKED_IN);
@@ -985,7 +994,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Check-out a booking (update booking's overall check-out status)
-  app.patch("/api/bookings/:id/check-out", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/bookings/:id/check-out", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const booking = await storage.updateBookingCheckInStatus(bookingId, GuestCheckInStatus.CHECKED_OUT);
@@ -999,9 +1008,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Allocate room to booking (VFast users)
-  app.patch("/api/bookings/:id/allocate", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/bookings/:id/allocate", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
-      console.log(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
+      logger.info(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
       const bookingId = parseInt(req.params.id);
       const allocationData = roomAllocationSchema.parse({
         bookingId: bookingId,
@@ -1030,10 +1039,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                          <p>Thank you for using VFast Booker.</p>`,
                   text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been successfully allocated a room. Room Number: ${booking.roomNumber}. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
                 });
-                console.log(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
+                logger.info(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
               }
             } catch (emailError) {
-              console.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
+              logger.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
             }
       
             res.json(booking);    } catch (error) {
@@ -1046,7 +1055,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get approved bookings (for VFast room allocation)
-  app.get("/api/bookings/approved", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/bookings/approved", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookings = await storage.getBookingsByStatus(BookingStatus.APPROVED);
       res.json(bookings);
@@ -1056,12 +1065,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
   
   // Get reconsideration requests (for VFast review)
-  app.get("/api/bookings/reconsideration", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/bookings/reconsideration", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
+    logger.info("Backend: /api/bookings/reconsideration route handler entered.");
     try {
       const bookings = await storage.getBookingsByStatus(BookingStatus.PENDING_RECONSIDERATION);
+      logger.info("Backend: /api/bookings/reconsideration - Found bookings:", bookings.length);
       res.json(bookings);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch reconsideration requests" });
+      logger.error("Backend: Error in /api/bookings/reconsideration:", error);
+      res.status(500).json({ message: "Failed to fetch reconsideration requests", error: (error as Error).message });
     }
   });
 
@@ -1139,7 +1151,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Update room status (Admin and VFast users)
-  app.patch("/api/rooms/:id/status", checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/rooms/:id/status", authenticateJwt, checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
     try {
       const roomId = parseInt(req.params.id);
       const { status, notes } = req.body;
@@ -1163,7 +1175,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Room Maintenance Endpoints
 
   // Create a room maintenance entry
-  app.post("/api/rooms/:roomId/maintenance", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/rooms/:roomId/maintenance", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const roomId = parseInt(req.params.roomId);
       const { reason, startDate, endDate, status } = req.body;
@@ -1189,7 +1201,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Update room maintenance status
-  app.patch("/api/room-maintenance/:maintenanceId/status", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/room-maintenance/:maintenanceId/status", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const maintenanceId = parseInt(req.params.maintenanceId);
       const { status } = req.body;
@@ -1211,7 +1223,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Get all active room maintenance entries
-  app.get("/api/rooms/maintenance/active", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.get("/api/rooms/maintenance/active", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const activeMaintenance = await storage.getActiveRoomMaintenance();
       res.json(activeMaintenance);
@@ -1253,11 +1265,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Upload document for a booking
-  app.post("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), (req, res, next) => {
-    console.log("Booking document upload route hit!"); // ADD THIS LINE
+  app.post("/api/bookings/:bookingId/document", authenticateJwt, checkRole([UserRole.VFAST]), (req, res, next) => {
+    logger.info("Booking document upload route hit!");
     upload.single('file')(req, res, (err: any) => {
       if (err) {
-        console.error("Multer error:", err);
+        logger.error("Multer error:", err);
         return res.status(400).json({ message: err.message });
       }
       next();
@@ -1265,33 +1277,33 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   }, async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
-      console.log("Parsed bookingId:", bookingId); // ADD THIS LINE
+      logger.info("Parsed bookingId:", bookingId);
       const file = req.file;
-      console.log("File object from Multer:", file); // ADD THIS LINE
+      logger.info("File object from Multer:", file);
 
       if (!file) {
-        console.error("No file uploaded after Multer processing."); // ADD THIS LINE
+        logger.error("No file uploaded after Multer processing.");
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      console.log("Updating booking with documentPath:", file.path); // ADD THIS LINE
+      logger.info("Updating booking with documentPath:", file.path);
       const booking = await storage.updateBooking(bookingId, { documentPath: file.path });
 
       if (!booking) {
-        console.error("Booking not found for ID:", bookingId); // ADD THIS LINE
+        logger.error("Booking not found for ID:", bookingId);
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      console.log("Booking updated successfully:", booking.id); // ADD THIS LINE
+      logger.info("Booking updated successfully:", booking.id);
       res.json(booking);
     } catch (error) {
-      console.error("Error in booking document upload (after Multer):", error);
+      logger.error("Error in booking document upload (after Multer):", error);
       res.status(500).json({ message: "Failed to upload document" });
     }
   });
 
   // Delete document for a booking
-  app.delete("/api/bookings/:bookingId/document", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.delete("/api/bookings/:bookingId/document", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
       const booking = await storage.getBooking(bookingId);
@@ -1312,7 +1324,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-  app.patch("/api/bookings/:id", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.patch("/api/bookings/:id", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.id);
       const updates = req.body;
@@ -1329,7 +1341,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-  app.post("/api/bookings/:bookingId/checkout-all", checkRole([UserRole.VFAST]), async (req, res) => {
+  app.post("/api/bookings/:bookingId/checkout-all", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
       const booking = await storage.checkOutAllGuests(bookingId);

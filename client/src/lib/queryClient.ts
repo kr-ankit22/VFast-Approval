@@ -16,6 +16,11 @@ export async function apiRequest(
   const headers: HeadersInit = {};
   let body: BodyInit | undefined;
 
+  const token = localStorage.getItem("token");
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   if (data) {
     if (isFormData) {
       body = data as FormData; // Cast to FormData
@@ -43,16 +48,30 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const token = localStorage.getItem("token");
+    console.log("queryClient.ts: Token from localStorage for query:", queryKey[0], token);
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+      console.log("queryClient.ts: Authorization header for query:", queryKey[0], headers["Authorization"]);
+    }
+
     const res = await fetch(queryKey[0] as string, {
+      headers,
       credentials: "include",
     });
 
+    console.log("queryClient.ts: Response status for query:", queryKey[0], res.status);
+
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      console.warn("queryClient.ts: Unauthorized (401) for query:", queryKey[0], ". Returning null.");
       return null;
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const data = await res.json();
+    console.log("queryClient.ts: Data received for query:", queryKey[0], data);
+    return data;
   };
 
 export const queryClient = new QueryClient({

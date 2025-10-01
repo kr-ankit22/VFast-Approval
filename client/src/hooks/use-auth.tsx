@@ -19,9 +19,10 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<User, Error, LoginUser>;
+  loginMutation: UseMutationResult<{ user: User, token: string }, Error, LoginUser>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<User, Error, any>;
+  refetch: () => void;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -34,8 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch,
   } = useQuery<User | undefined, Error>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/users/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
@@ -44,28 +46,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
-    onSuccess: (user: User) => {
-      // Clear any stale query data first
-      queryClient.clear();
+    onSuccess: (data: { user: User, token: string }) => {
+      localStorage.setItem("token", data.token);
       
       // Set the user data in cache
-      queryClient.setQueryData(["/api/user"], user);
+      queryClient.setQueryData(["/api/users/me"], data.user);
       
       // Show success toast
       toast({
         title: "Login successful",
-        description: `Welcome back, ${user.name}!`,
+        description: `Welcome back, ${data.user.name}!`,
         variant: "default",
       });
       
       // Redirect to appropriate dashboard based on user role
-      const redirectPath = user.role === UserRole.BOOKING 
+      const redirectPath = data.user.role === UserRole.BOOKING 
         ? "/booking" 
-        : user.role === UserRole.DEPARTMENT_APPROVER
+        : data.user.role === UserRole.DEPARTMENT_APPROVER
           ? "/department"
-          : user.role === UserRole.ADMIN
+          : data.user.role === UserRole.ADMIN
           ? "/admin"
-          : user.role === UserRole.VFAST
+          : data.user.role === UserRole.VFAST
             ? "/vfast"
             : "/";
             
@@ -126,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      localStorage.removeItem("token"); // Explicitly remove the JWT token
       // Clear all query cache to ensure clean state
       queryClient.clear();
       
@@ -156,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        refetch,
       }}
     >
       {children}

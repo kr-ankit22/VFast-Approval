@@ -30,7 +30,7 @@ export default function BookingStatusBadge({ status, className }: BookingStatusB
           className: "bg-red-100 text-red-800 hover:bg-red-100",
           label: "Rejected"
         };
-      case Booking.ALLOCATED:
+      case BookingStatus.ALLOCATED:
         return {
           className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
           label: "Allocated"
