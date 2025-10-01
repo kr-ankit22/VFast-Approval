@@ -34,9 +34,13 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
   department: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"], // path of error
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -61,7 +65,7 @@ const checkRole = (roles: UserRole[]) => {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<void> {
   app.get("/test", (req, res) => {
-    logger.info("Test route hit!");
+    // logger.info
     res.send("Test successful!");
   });
 
@@ -73,17 +77,17 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   app.get(
     "/api/auth/google/callback",
     (req, res, next) => {
-      passport.authenticate("google", (err, user, info) => {
+      passport.authenticate("google", (err: any, user: any, info: any) => {
         if (err) {
-          logger.error("Google Auth Error:", err);
+          logger.error({ err }, "Google Auth Error");
           return res.redirect("/login?error=" + encodeURIComponent(err.message));
         }
         if (!user) {
-          logger.warn("Google Auth Failed - No user:", info);
+  // logger.warn
           return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
         }
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
-        logger.info("Google Login: Token generated. Redirecting to /.");
+        logger.info("Google Login: Token generated. Redirecting to /");
         res.redirect(`/?token=${token}`);
       })(req, res, next);
     }
@@ -107,13 +111,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         password: hashedPassword,
         role,
         phone,
-        department_id: department ? parseInt(department) : undefined, // Assuming department is an ID
+        department_id: parseInt(department),
       });
 
       // Log the user in after successful registration
       req.login(newUser, async (err) => {
         if (err) {
-          logger.error("Error logging in after registration:", err);
+          logger.error({ err }, "Error logging in after registration");
           return res.status(500).json({ message: "Failed to log in after registration." });
         }
 
@@ -125,9 +129,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
             text: `Welcome, ${newUser.name}! Your account has been successfully created. You can now log in to the VFast Booker application.`,
           });
-          logger.info(`Welcome email sent to ${newUser.email}`);
+          logger.info({ email: newUser.email }, "Welcome email sent");
         } catch (emailError) {
-          logger.error(`Failed to send welcome email to ${newUser.email}:`, emailError);
+          logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
           // Continue even if email fails, as user account is created
         }
 
@@ -138,7 +142,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error("Registration error:", error);
+      logger.error({ err: error }, "Registration error");
       res.status(500).json({ message: "Failed to register user." });
     }
   });
@@ -160,13 +164,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     // However, if session middleware is still active, we can clear it for completeness.
     req.logout((err) => {
       if (err) {
-        logger.error("Logout error:", err);
+        logger.error({ err }, "Logout error");
         return res.status(500).json({ message: "Failed to log out." });
       }
       if (req.session) {
         req.session.destroy((err) => {
           if (err) {
-            logger.error("Session destruction error:", err);
+            logger.error({ err }, "Session destruction error");
             return res.status(500).json({ message: "Failed to destroy session." });
           }
           res.clearCookie('connect.sid'); // Clear session cookie
@@ -179,7 +183,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   app.get("/api/users/me", passport.authenticate('jwt', { session: false }), (req, res) => {
-    logger.info("Backend: /api/users/me - Sending user data:", req.user);
+    logger.info({ user: req.user }, "Backend: /api/users/me - Sending user data");
     res.json(req.user);
   });
 
@@ -276,7 +280,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      logger.error("Error fetching all users:", error);
+      logger.error({ err: error }, "Error fetching all users");
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
@@ -288,7 +292,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const totalDepartments = await storage.getTotalDepartments();
       res.json({ totalUsers, totalDepartments });
     } catch (error) {
-      logger.error("Error fetching user stats:", error);
+      logger.error({ err: error }, "Error fetching user stats");
       res.status(500).json({ message: "Failed to fetch user stats" });
     }
   });
@@ -320,7 +324,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error("Error creating user:", error);
+      logger.error({ err: error }, "Error creating user");
       res.status(500).json({ message: "Failed to create user." });
     }
   });
@@ -348,7 +352,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error("Error updating user:", error);
+      logger.error({ err: error }, "Error updating user");
       res.status(500).json({ message: "Failed to update user." });
     }
   });

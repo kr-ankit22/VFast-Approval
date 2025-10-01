@@ -80,14 +80,7 @@ export const users = pgTable("users", {
 
 // Insert schema for user registration
 export const insertUserSchema = createInsertSchema(users)
-  .omit({ id: true, createdAt: true })
-  .extend({
-    confirmPassword: z.string()
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+  .omit({ id: true, createdAt: true });
 
 // Login schema
 export const loginUserSchema = z.object({

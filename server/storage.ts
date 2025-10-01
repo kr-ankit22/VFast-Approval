@@ -852,7 +852,7 @@ export class DatabaseStorage implements IStorage {
   async uploadDocument(file: string): Promise<string> {
     // Mock implementation: In a real application, this would upload the file to a storage service (e.g., S3, Azure Blob Storage)
     // and return the URL. For now, we'll just return a dummy URL.
-    logger.info(`Mocking document upload for file: ${file}`);
+    logger.info({ file }, `Mocking document upload for file`);
     return `https://example.com/documents/${Date.now()}-${file.substring(0, 10)}.pdf`;
   }
 
@@ -985,7 +985,7 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(rooms)
         .where(eq(rooms.status, RoomStatus.AVAILABLE));
-      logger.info("getAllAvailableRooms result:", availableRooms);
+      logger.info({ availableRooms }, "getAllAvailableRooms result");
       return availableRooms;
     } catch (error: any) {
       logger.error({ err: error }, "Error in getAllAvailableRooms");
