@@ -42,7 +42,7 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
     );
     logger.info("PgStore (connect-pg-simple) initialized.");
   } catch (error) {
-    logger.error("Failed to initialize PgStore (connect-pg-simple):", error);
+    logger.error({ err: error }, "Failed to initialize PgStore (connect-pg-simple):");
     process.exit(1); // Exit if session store cannot be initialized
   }
 
@@ -61,7 +61,7 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
     await db.execute(sql`SELECT 1`);
     logger.info("Database connection established.");
   } catch (error) {
-    logger.error("Failed to establish database connection:", error);
+    logger.error({ err: error }, "Failed to establish database connection:");
     process.exit(1);
   }
 

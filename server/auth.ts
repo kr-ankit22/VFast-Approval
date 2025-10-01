@@ -44,25 +44,25 @@ const jwtOptions = {
   secretOrKey: process.env.JWT_SECRET,
 };
 
-logger.info("JWT Strategy: Using secretOrKey:", jwtOptions.secretOrKey ? "[SECRET_PRESENT]" : "[SECRET_MISSING]");
+logger.info({ secretOrKey: jwtOptions.secretOrKey ? "[SECRET_PRESENT]" : "[SECRET_MISSING]" }, "JWT Strategy: Using secretOrKey");
 
 passport.use(
   new JwtStrategy(jwtOptions, async (payload, done) => {
-    logger.info("JWT Strategy: Payload received:", payload);
+    logger.info({ payload }, "JWT Strategy: Payload received");
     try {
       const user = await db.query.users.findFirst({
         where: eq(users.id, payload.id),
       });
 
       if (user) {
-        logger.info("JWT Strategy: User found:", user.id);
+        logger.info({ userId: user.id }, "JWT Strategy: User found");
         return done(null, user);
       } else {
         logger.warn("JWT Strategy: User not found for payload:", payload);
         return done(null, false);
       }
     } catch (error) {
-      logger.error("JWT Strategy: Error during user lookup:", error);
+      logger.error({ err: error }, "JWT Strategy: Error during user lookup");
       return done(error, false);
     }
   })
@@ -84,7 +84,7 @@ passport.deserializeUser(async (id: string, done) => {
 
     done(null, user);
   } catch (error) {
-    logger.error("Passport: Error deserializing user:", error);
+    logger.error({ err: error }, "Passport: Error deserializing user");
     done(error, undefined);
   }
 });
