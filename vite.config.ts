@@ -16,6 +16,9 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  esbuild: {
+    tsconfig: 'client/tsconfig.json'
+  },
   server: {
     proxy: {
       '/api': {
