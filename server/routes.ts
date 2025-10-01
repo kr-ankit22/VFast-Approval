@@ -236,14 +236,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       complete: async (results) => {
         const errors: string[] = [];
         const validRows = [];
-        let created = 0;
-        let updated = 0;
 
-        // First pass: Validate all rows
+        // First pass: Validate all rows for basic requirements
         for (const [index, row] of (results.data as any[]).entries()) {
-          const { email, role, department } = row;
+          const { email, role, department, password } = row;
           if (!email || !role || !department) {
-            // Skip empty lines that PapaParse might still pass
             if (!email && !role && !department) continue;
             errors.push(`Row ${index + 2}: Missing required fields. 'email', 'role', and 'department' are all mandatory.`);
           } else {
@@ -255,10 +252,22 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
           return res.status(400).json({ message: "CSV validation failed. No users were created or updated.", errors });
         }
 
-        // Second pass: Process valid rows
+        // Second pass: Process valid rows with new policy
         for (const row of validRows) {
-          const { email, role, name, phone, department } = row;
+          const { email, role, name, phone, department, password } = row;
           
+          // Rule 1: If password is provided in CSV, reject
+          if (password) {
+            errors.push(`Row for ${email}: Password provided in CSV. Only Google users without passwords can be bulk created.`);
+            continue; // Skip this row
+          }
+
+          // Rule 2 & 3: If no password, check email for Gmail
+          if (!email.endsWith('@gmail.com')) {
+            errors.push(`Row for ${email}: Non-Gmail email without a password. Only Gmail users can be bulk created without a password.`);
+            continue; // Skip this row
+          }
+
           const existingUser = await storage.getUserByEmail(email);
 
           const userData = {
@@ -266,23 +275,30 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             email,
             role,
             phone,
-            department_id: parseInt(department, 10)
+            department_id: parseInt(department, 10),
+            password: null, // Always null for bulk created Google users
           };
 
           if (isNaN(userData.department_id)) {
-            return res.status(400).json({ message: `Invalid Department ID found for user ${email}. Department must be a number.` });
+            errors.push(`Row for ${email}: Invalid Department ID. Department must be a number.`);
+            continue; // Skip this row
           }
 
           if (existingUser) {
-            await storage.updateUser(existingUser.id, userData);
-            updated++;
+            // For existing users, we only update if they are Google users and no password was provided
+            if (existingUser.googleId) {
+              await storage.updateUser(existingUser.id, userData);
+              updated++;
+            } else {
+              errors.push(`Row for ${email}: Existing user is not a Google user. Cannot update via bulk upload.`);
+            }
           } else {
-            await storage.createUser({ ...userData, password: 'password' });
+            await storage.createUser(userData);
             created++;
           }
         }
 
-        res.json({ created, updated });
+        res.json({ created, updated, errors });
       },
       error: (error) => {
         res.status(500).json({ message: "Failed to parse CSV file", error });
