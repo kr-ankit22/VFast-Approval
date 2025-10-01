@@ -55,10 +55,29 @@ import { HelpCircle } from "lucide-react";
 const userFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email format"),
-  password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
   department: z.string({ required_error: "Department is required." }).min(1, "Department is required."),
+  authMethod: z.enum(["Password", "Google"]),
+}).superRefine(({ confirmPassword, password, authMethod }, ctx) => {
+  if (authMethod === "Password") {
+    if (!password || password.length < 6) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["password"],
+        message: "Password must be at least 6 characters",
+      });
+    }
+    if (password !== confirmPassword) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["confirmPassword"],
+        message: "Passwords do not match",
+      });
+    }
+  }
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -186,9 +205,11 @@ export default function UserManagementPage() {
       name: "",
       email: "",
       password: "",
+      confirmPassword: "",
       role: UserRole.BOOKING,
       phone: "",
       department: "",
+      authMethod: "Password",
     },
   });
 
@@ -200,15 +221,27 @@ export default function UserManagementPage() {
         role: editingUser.role, 
         phone: editingUser.mobileNumber || "",
         department: editingUser.department_id?.toString() || "",
-        password: "" 
+        password: "",
+        confirmPassword: "",
+        authMethod: "Password",
       });
     } else {
-      userForm.reset();
+      userForm.reset({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: UserRole.BOOKING,
+        phone: "",
+        department: "",
+        authMethod: "Password",
+      });
     }
   }, [editingUser, userForm]);
 
   const onUserFormSubmit = (data: UserFormValues) => {
-    userMutation.mutate({ ...data, id: editingUser?.id });
+    const { confirmPassword, ...rest } = data;
+    userMutation.mutate({ ...rest, id: editingUser?.id });
   };
 
   const handleEditUser = (user: User) => {
@@ -336,20 +369,58 @@ export default function UserManagementPage() {
                         />
                         <FormField
                           control={userForm.control}
-                          name="password"
+                          name="authMethod"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="••••••••" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
-                              </FormDescription>
+                              <FormLabel>Authentication Method</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select an authentication method" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Password">Password</SelectItem>
+                                  <SelectItem value="Google">Google</SelectItem>
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
+                        {userForm.watch("authMethod") === "Password" && (
+                          <>
+                            <FormField
+                              control={userForm.control}
+                              name="password"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Password</FormLabel>
+                                  <FormControl>
+                                    <Input type="password" placeholder="••••••••" {...field} />
+                                  </FormControl>
+                                  <FormDescription>
+                                    {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={userForm.control}
+                              name="confirmPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Confirm Password</FormLabel>
+                                  <FormControl>
+                                    <Input type="password" placeholder="••••••••" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
                         <FormField
                           control={userForm.control}
                           name="role"

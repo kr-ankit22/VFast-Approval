@@ -33,14 +33,29 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email format"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
   department: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"], // path of error
+  authMethod: z.enum(["Password", "Google"]),
+}).superRefine(({ confirmPassword, password, authMethod }, ctx) => {
+  if (authMethod === "Password") {
+    if (!password || password.length < 6) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["password"],
+        message: "Password must be at least 6 characters",
+      });
+    }
+    if (password !== confirmPassword) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["confirmPassword"],
+        message: "Passwords do not match",
+      });
+    }
+  }
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -96,14 +111,17 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Local Register Route
   app.post("/api/register", async (req, res) => {
     try {
-      const { name, email, password, role, phone, department } = registerSchema.parse(req.body);
+      const { name, email, password, authMethod, role, phone, department } = registerSchema.parse(req.body);
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(409).json({ message: "User with this email already exists." });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      let hashedPassword: string | null = null;
+      if (authMethod === "Password" && password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      }
 
       const newUser = await storage.createUser({
         name,
@@ -300,14 +318,17 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Create a new user (Admin only)
   app.post("/api/admin/users", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
     try {
-      const { name, email, password, role, phone, department } = registerSchema.parse(req.body);
+      const { name, email, password, authMethod, role, phone, department } = registerSchema.parse(req.body);
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(409).json({ message: "User with this email already exists." });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      let hashedPassword: string | null = null;
+      if (authMethod === "Password" && password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      }
 
       const newUser = await storage.createUser({
         name,
@@ -315,7 +336,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         password: hashedPassword,
         role,
         phone,
-        department_id: department ? parseInt(department) : undefined,
+        department_id: parseInt(department),
       });
 
       res.status(201).json(newUser);
