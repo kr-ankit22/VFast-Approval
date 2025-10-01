@@ -65,7 +65,7 @@ const checkRole = (roles: UserRole[]) => {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<void> {
   app.get("/test", (req, res) => {
-    // logger.info
+    // // logger.info
     res.send("Test successful!");
   });
 
@@ -79,15 +79,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     (req, res, next) => {
       passport.authenticate("google", (err: any, user: any, info: any) => {
         if (err) {
-          logger.error({ err }, "Google Auth Error");
+          // logger.error({ err }, "Google Auth Error");
           return res.redirect("/login?error=" + encodeURIComponent(err.message));
         }
         if (!user) {
-  // logger.warn
+  // // logger.warn
           return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
         }
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
-        logger.info("Google Login: Token generated. Redirecting to /");
+        // logger.info("Google Login: Token generated. Redirecting to /");
         res.redirect(`/?token=${token}`);
       })(req, res, next);
     }
@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       // Log the user in after successful registration
       req.login(newUser, async (err) => {
         if (err) {
-          logger.error({ err }, "Error logging in after registration");
+          // logger.error({ err }, "Error logging in after registration");
           return res.status(500).json({ message: "Failed to log in after registration." });
         }
 
@@ -129,9 +129,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
             text: `Welcome, ${newUser.name}! Your account has been successfully created. You can now log in to the VFast Booker application.`,
           });
-          logger.info({ email: newUser.email }, "Welcome email sent");
+          // logger.info({ email: newUser.email }, "Welcome email sent");
         } catch (emailError) {
-          logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
+          // logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
           // Continue even if email fails, as user account is created
         }
 
@@ -142,7 +142,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error({ err: error }, "Registration error");
+      // logger.error({ err: error }, "Registration error");
       res.status(500).json({ message: "Failed to register user." });
     }
   });
@@ -164,13 +164,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     // However, if session middleware is still active, we can clear it for completeness.
     req.logout((err) => {
       if (err) {
-        logger.error({ err }, "Logout error");
+        // logger.error({ err }, "Logout error");
         return res.status(500).json({ message: "Failed to log out." });
       }
       if (req.session) {
         req.session.destroy((err) => {
           if (err) {
-            logger.error({ err }, "Session destruction error");
+            // logger.error({ err }, "Session destruction error");
             return res.status(500).json({ message: "Failed to destroy session." });
           }
           res.clearCookie('connect.sid'); // Clear session cookie
@@ -183,7 +183,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   app.get("/api/users/me", passport.authenticate('jwt', { session: false }), (req, res) => {
-    logger.info({ user: req.user }, "Backend: /api/users/me - Sending user data");
+    // logger.info({ user: req.user }, "Backend: /api/users/me - Sending user data");
     res.json(req.user);
   });
 
@@ -280,7 +280,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      logger.error({ err: error }, "Error fetching all users");
+      // logger.error({ err: error }, "Error fetching all users");
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const totalDepartments = await storage.getTotalDepartments();
       res.json({ totalUsers, totalDepartments });
     } catch (error) {
-      logger.error({ err: error }, "Error fetching user stats");
+      // logger.error({ err: error }, "Error fetching user stats");
       res.status(500).json({ message: "Failed to fetch user stats" });
     }
   });
@@ -324,7 +324,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error({ err: error }, "Error creating user");
+      // logger.error({ err: error }, "Error creating user");
       res.status(500).json({ message: "Failed to create user." });
     }
   });
@@ -352,7 +352,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      logger.error({ err: error }, "Error updating user");
+      // logger.error({ err: error }, "Error updating user");
       res.status(500).json({ message: "Failed to update user." });
     }
   });
@@ -364,7 +364,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       await storage.deleteUser(userId);
       res.status(204).send(); // No content
     } catch (error) {
-      logger.error("Error deleting user:", error);
+      // logger.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user." });
     }
   });
@@ -375,7 +375,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookings = await storage.getAllocatedBookings();
       res.json(bookings);
     } catch (error) {
-      logger.error("Error in /api/bookings/worklist:", error);
+      // logger.error("Error in /api/bookings/worklist:", error);
       res.status(500).json({ message: "Failed to fetch guest worklist" });
     }
   });
@@ -385,7 +385,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const stats = await storage.getVFastAllocationStats();
       res.json(stats);
     } catch (error: any) {
-      logger.error("Failed to fetch VFast allocation stats", { error: error.message });
+      // logger.error("Failed to fetch VFast allocation stats", { error: error.message });
       res.status(500).json({ message: "Failed to fetch VFast allocation stats", error: error.message });
     }
   });
@@ -509,8 +509,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Update booking status (Department Approver)
   app.patch("/api/bookings/:id/department-approval", authenticateJwt, checkRole([UserRole.DEPARTMENT_APPROVER]), async (req, res) => {
     try {
-      logger.info(`[BACKEND] Received department approval request for booking ID: ${req.params.id}`);
-      logger.info("[BACKEND] Request body:", req.body);
+      // logger.info(`[BACKEND] Received department approval request for booking ID: ${req.params.id}`);
+      // logger.info("[BACKEND] Request body:", req.body);
 
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -519,13 +519,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       const { status, notes } = req.body;
 
-      logger.info(`[BACKEND] Status received from frontend: "${status}"`);
-      logger.info(`[BACKEND] Comparing with BookingStatus.APPROVED: "${BookingStatus.APPROVED}"`);
-      logger.info(`[BACKEND] Comparing with BookingStatus.REJECTED: "${BookingStatus.REJECTED}"`);
-      logger.info(`[BACKEND] Is status === BookingStatus.APPROVED? ${status === BookingStatus.APPROVED}`);
-      logger.info(`[BACKEND] Is status === BookingStatus.REJECTED? ${status === BookingStatus.REJECTED}`);
+      // logger.info(`[BACKEND] Status received from frontend: "${status}"`);
+      // logger.info(`[BACKEND] Comparing with BookingStatus.APPROVED: "${BookingStatus.APPROVED}"`);
+      // logger.info(`[BACKEND] Comparing with BookingStatus.REJECTED: "${BookingStatus.REJECTED}"`);
+      // logger.info(`[BACKEND] Is status === BookingStatus.APPROVED? ${status === BookingStatus.APPROVED}`);
+      // logger.info(`[BACKEND] Is status === BookingStatus.REJECTED? ${status === BookingStatus.REJECTED}`);
 
-      logger.info(`[BACKEND] Calling updateBookingStatus with status: ${status}`);
+      // logger.info(`[BACKEND] Calling updateBookingStatus with status: ${status}`);
 
       if (status !== BookingStatus.APPROVED && status !== BookingStatus.REJECTED) {
         return res.status(400).json({ message: "Invalid status update" });
@@ -540,7 +540,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       }, req.user.role as UserRole);
 
       if (!booking) {
-        logger.warn(`[BACKEND] Booking ${bookingId} not found.`);
+        // logger.warn(`[BACKEND] Booking ${bookingId} not found.`);
         return res.status(404).json({ message: "Booking not found" });
       }
 
@@ -554,16 +554,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             html: `<h1>Booking Status Update</h1>\r\n                   <p>Dear ${bookingUser.name},</p>\r\n                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>\r\n                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}\r\n                   <p>Thank you for using VFast Booker.</p>`,
             text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by the Department Approver. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
           });
-          logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
+          // logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        // logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
       }
 
-      logger.info(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
+      // logger.info(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
       res.json(booking);
     } catch (error) {
-      logger.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error);
+      // logger.error("[BACKEND] Error in /api/bookings/:id/department-approval:", error);
       res.status(500).json({ message: "Failed to update booking status" });
     }
   });
@@ -575,7 +575,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      logger.info(req.body);
+      // logger.info(req.body);
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
       });
-      logger.info("Booking data before creation:", bookingData);
+      // logger.info("Booking data before creation:", bookingData);
       const booking = await storage.createBooking(bookingData);
 
       // Send email notification to Department Approver
@@ -601,15 +601,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                      <p>Please review the request in the VFast Booker application.</p>`,
               text: `Dear ${approver.name}, A new booking request #${booking.id} has been submitted for your department, ${department.name}. Please review the request in the VFast Booker application.`,
             });
-            logger.info(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
+            // logger.info(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
           }
         }
       } catch (emailError) {
-        logger.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
+        // logger.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
       }
       res.status(201).json(booking);
     } catch (error) {
-      logger.error("Booking creation error:", error);
+      // logger.error("Booking creation error:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -652,15 +652,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                    <p>Thank you for using VFast Booker.</p>`,
             text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by an Administrator. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
           });
-          logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
+          // logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        // logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
       }
       
       res.json(booking);
     } catch (error) {
-      logger.error("Error updating booking status:", error);
+      // logger.error("Error updating booking status:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -861,15 +861,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (booking && !booking.firstCheckedInGuestName) {
         // If firstCheckedInGuestName is not set, update it with the current guest's name
         await storage.updateBooking(guest.bookingId, { firstCheckedInGuestName: guest.name });
-        logger.info(`Updated booking ${guest.bookingId} with firstCheckedInGuestName: ${guest.name}`);
+        // logger.info(`Updated booking ${guest.bookingId} with firstCheckedInGuestName: ${guest.name}`);
       } else if (booking) {
-        logger.info(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`);
+        // logger.info(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`);
       }
       
       await storage.updateBooking(guest.bookingId, { keyHandedOver: true });
       res.json(guest);
     } catch (error) {
-      logger.error("Error in /api/guests/:guestId/check-in:", error);
+      // logger.error("Error in /api/guests/:guestId/check-in:", error);
       res.status(500).json({ message: "Failed to check-in guest" });
     }
   });
@@ -1014,7 +1014,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Allocate room to booking (VFast users)
   app.patch("/api/bookings/:id/allocate", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
-      logger.info(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
+      // logger.info(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
       const bookingId = parseInt(req.params.id);
       const allocationData = roomAllocationSchema.parse({
         bookingId: bookingId,
@@ -1043,10 +1043,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
                          <p>Thank you for using VFast Booker.</p>`,
                   text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been successfully allocated a room. Room Number: ${booking.roomNumber}. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
                 });
-                logger.info(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
+                // logger.info(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
               }
             } catch (emailError) {
-              logger.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
+              // logger.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
             }
       
             res.json(booking);    } catch (error) {
@@ -1070,13 +1070,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   
   // Get reconsideration requests (for VFast review)
   app.get("/api/bookings/reconsideration", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
-    logger.info("Backend: /api/bookings/reconsideration route handler entered.");
+    // logger.info("Backend: /api/bookings/reconsideration route handler entered.");
     try {
       const bookings = await storage.getBookingsByStatus(BookingStatus.PENDING_RECONSIDERATION);
-      logger.info("Backend: /api/bookings/reconsideration - Found bookings:", bookings.length);
+      // logger.info("Backend: /api/bookings/reconsideration - Found bookings:", bookings.length);
       res.json(bookings);
     } catch (error) {
-      logger.error("Backend: Error in /api/bookings/reconsideration:", error);
+      // logger.error("Backend: Error in /api/bookings/reconsideration:", error);
       res.status(500).json({ message: "Failed to fetch reconsideration requests", error: (error as Error).message });
     }
   });
@@ -1270,10 +1270,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Upload document for a booking
   app.post("/api/bookings/:bookingId/document", authenticateJwt, checkRole([UserRole.VFAST]), (req, res, next) => {
-    logger.info("Booking document upload route hit!");
+    // logger.info("Booking document upload route hit!");
     upload.single('file')(req, res, (err: any) => {
       if (err) {
-        logger.error("Multer error:", err);
+        // logger.error("Multer error:", err);
         return res.status(400).json({ message: err.message });
       }
       next();
@@ -1281,27 +1281,27 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   }, async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
-      logger.info("Parsed bookingId:", bookingId);
+      // logger.info("Parsed bookingId:", bookingId);
       const file = req.file;
-      logger.info("File object from Multer:", file);
+      // logger.info("File object from Multer:", file);
 
       if (!file) {
-        logger.error("No file uploaded after Multer processing.");
+        // logger.error("No file uploaded after Multer processing.");
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      logger.info("Updating booking with documentPath:", file.path);
+      // logger.info("Updating booking with documentPath:", file.path);
       const booking = await storage.updateBooking(bookingId, { documentPath: file.path });
 
       if (!booking) {
-        logger.error("Booking not found for ID:", bookingId);
+        // logger.error("Booking not found for ID:", bookingId);
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      logger.info("Booking updated successfully:", booking.id);
+      // logger.info("Booking updated successfully:", booking.id);
       res.json(booking);
     } catch (error) {
-      logger.error("Error in booking document upload (after Multer):", error);
+      // logger.error("Error in booking document upload (after Multer):", error);
       res.status(500).json({ message: "Failed to upload document" });
     }
   });

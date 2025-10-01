@@ -40,9 +40,9 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
         cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
       })
     );
-    logger.info("PgStore (connect-pg-simple) initialized.");
+    // logger.info("PgStore (connect-pg-simple) initialized.");
   } catch (error) {
-    logger.error({ err: error }, "Failed to initialize PgStore (connect-pg-simple):");
+    // logger.error({ err: error }, "Failed to initialize PgStore (connect-pg-simple):");
     process.exit(1); // Exit if session store cannot be initialized
   }
 
@@ -59,9 +59,9 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
 
   try {
     await db.execute(sql`SELECT 1`);
-    logger.info("Database connection established.");
+    // logger.info("Database connection established.");
   } catch (error) {
-    logger.error({ err: error }, "Failed to establish database connection:");
+    // logger.error({ err: error }, "Failed to establish database connection:");
     process.exit(1);
   }
 
@@ -71,7 +71,7 @@ export async function createApp(): Promise<{ app: express.Express, storage: ISto
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    logger.error(err);
+    // logger.error(err);
     res.status(status).json({ message });
   });
 
