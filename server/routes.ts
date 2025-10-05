@@ -4,7 +4,7 @@ import { IStorage } from "./storage";
 import bcrypt from 'bcrypt';
 import { sendEmail } from './email';
 import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate } from './email-templates';
-import { FRONTEND_BASE_URL } from './config';
+import { config } from '../shared/env';
 import { 
   insertBookingSchema, 
   departmentApprovalSchema, 
