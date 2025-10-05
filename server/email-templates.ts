@@ -3,7 +3,7 @@ import { User, Booking, Room, BookingStatus } from "@shared/schema";
 import fs from 'fs/promises';
 import path from 'path';
 
-import { config } from '../../shared/env';
+import { config } from '../shared/env';
 
 export const welcomeEmailTemplate = async (user: User, loginUrl: string) => {
   const appBaseUrl = config.frontendAppUrl;
