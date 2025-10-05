@@ -1,14 +1,15 @@
 import pino from 'pino';
 
-const isProduction = process.env.NODE_ENV === 'production';
+// This is a more robust way to detect if the code is running on Netlify
+const isNetlify = process.env.NETLIFY === 'true';
 
 const logger = pino(
-  isProduction
-    ? // Production config: JSON logs
+  isNetlify
+    ? // In any Netlify environment (production, previews, etc.), use JSON logs.
       {
         level: 'info',
       }
-    : // Development config: pretty logs
+    : // For local development, use pino-pretty.
       {
         transport: {
           target: 'pino-pretty',
