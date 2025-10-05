@@ -40,6 +40,6 @@ export async function sendEmail(options: EmailOptions) {
     return info;
   } catch (error: any) {
     logger.error({ err: error, to: options.to, subject: options.subject }, "Error sending email");
-    throw new Error('Failed to send email');
+    // throw new Error('Failed to send email');
   }
 }
