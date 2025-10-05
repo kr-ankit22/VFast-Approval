@@ -488,7 +488,7 @@ export class DatabaseStorage implements IStorage {
       const user = await this.getUser(booking.userId);
       if (user) {
         const approverRole = role === UserRole.ADMIN ? 'Administrator' : 'Department Approver';
-        const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, user, booking.status, approverRole, FRONTEND_BASE_URL);
+        const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, user, booking.status, approverRole, config.frontendLoginUrl);
         sendEmail({
           to: user.email,
           subject: emailTemplate.subject,
@@ -503,7 +503,7 @@ export class DatabaseStorage implements IStorage {
         for (const admin of admins) {
           if (admin.email) {
             const department = await this.getDepartment(booking.department_id);
-            const emailTemplate = await newBookingRequestEmailTemplate(booking, admin, department?.name || 'N/A', FRONTEND_BASE_URL);
+            const emailTemplate = await newBookingRequestEmailTemplate(booking, admin, department?.name || 'N/A', config.frontendLoginUrl);
             sendEmail({
               to: admin.email,
               subject: emailTemplate.subject,
@@ -519,7 +519,7 @@ export class DatabaseStorage implements IStorage {
         const vfastUsers = await this.getUsersByRole(UserRole.VFAST);
         for (const vfastUser of vfastUsers) {
           if (vfastUser.email) {
-            const emailTemplate = await bookingForAllocationEmailTemplate(booking, FRONTEND_BASE_URL);
+            const emailTemplate = await bookingForAllocationEmailTemplate(booking, config.frontendLoginUrl);
             sendEmail({
               to: vfastUser.email,
               subject: emailTemplate.subject,
@@ -535,7 +535,7 @@ export class DatabaseStorage implements IStorage {
         const departmentApprover = await this.getUser(currentBooking.departmentApproverId);
         if (departmentApprover && departmentApprover.email) {
           const department = await this.getDepartment(booking.department_id);
-          const emailTemplate = await bookingRejectedByAdminEmailTemplate(booking, departmentApprover, department?.name || 'N/A', FRONTEND_BASE_URL);
+          const emailTemplate = await bookingRejectedByAdminEmailTemplate(booking, departmentApprover, department?.name || 'N/A', config.frontendLoginUrl);
           sendEmail({
             to: departmentApprover.email,
             subject: emailTemplate.subject,
@@ -840,7 +840,7 @@ export class DatabaseStorage implements IStorage {
         // Send email notification
         const user = await this.getUser(updatedBooking.userId);
         if (user) {
-          const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, FRONTEND_BASE_URL);
+          const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, config.frontendLoginUrl);
           sendEmail({
             to: user.email,
             subject: emailTemplate.subject,
