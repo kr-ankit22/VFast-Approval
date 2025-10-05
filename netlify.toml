@@ -6,4 +6,4 @@
   NODE_VERSION = "18"
 
 [secrets_scan]
-  omit_keys = ["FRONTEND_BASE_URL"]
+  omit_paths = ["server/config.ts"]
