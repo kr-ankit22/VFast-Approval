@@ -22,6 +22,8 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
 import { sendEmail } from "./email";
+import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate } from './email-templates';
+import { FRONTEND_BASE_URL } from './config';
 
 import logger from "./logger";
 
@@ -34,6 +36,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  getDepartmentApprovers(departmentId: number): Promise<User[]>;
+  getUsersByRole(role: UserRole): Promise<User[]>;
   deleteUser(id: number): Promise<void>;
 
   // Booking operations
@@ -171,6 +175,30 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       // logger.error({ err: error }, "Error in getAllUsers");
       throw new Error("Failed to retrieve all users.");
+    }
+  }
+
+  async getDepartmentApprovers(departmentId: number): Promise<User[]> {
+    try {
+      logger.info({ departmentId }, "Fetching department approvers for department ID");
+      const approvers = await this.dbClient.select().from(users).where(and(eq(users.role, UserRole.DEPARTMENT_APPROVER), eq(users.department_id, departmentId)));
+      logger.info({ approversCount: approvers.length, departmentId }, "Found department approvers");
+      return approvers;
+    } catch (error: any) {
+      logger.error({ err: error, departmentId }, `Error in getDepartmentApprovers for department ID ${departmentId}`);
+      throw new Error("Failed to retrieve department approvers.");
+    }
+  }
+
+  async getUsersByRole(role: UserRole): Promise<User[]> {
+    try {
+      logger.info({ role }, "Fetching users by role");
+      const usersByRole = await this.dbClient.select().from(users).where(eq(users.role, role));
+      logger.info({ usersCount: usersByRole.length, role }, "Found users by role");
+      return usersByRole;
+    } catch (error: any) {
+      logger.error({ err: error, role }, `Error in getUsersByRole for role ${role}`);
+      throw new Error("Failed to retrieve users by role.");
     }
   }
 
@@ -456,15 +484,65 @@ export class DatabaseStorage implements IStorage {
 
       await this.createAuditLog("bookings", booking.id.toString(), "update_status", approverId?.toString(), `Status changed to ${status}`);
 
-      // Send email notification
+      // Send email notification to the booking user
       const user = await this.getUser(booking.userId);
       if (user) {
+        const approverRole = role === UserRole.ADMIN ? 'Administrator' : 'Department Approver';
+        const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, user, booking.status, approverRole, FRONTEND_BASE_URL);
         sendEmail({
           to: user.email,
-          subject: `Booking status updated to ${booking.status}`,
-          text: `Your booking with ID ${booking.id} has been updated to ${booking.status}.`,
-          html: `<p>Your booking with ID ${booking.id} has been updated to ${booking.status}.</p>`,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
         });
+      }
+
+      // Send email notification to admin users if the booking is pending admin approval
+      if (booking.status === BookingStatus.PENDING_ADMIN_APPROVAL) {
+        const admins = await this.getUsersByRole(UserRole.ADMIN);
+        for (const admin of admins) {
+          if (admin.email) {
+            const department = await this.getDepartment(booking.department_id);
+            const emailTemplate = await newBookingRequestEmailTemplate(booking, admin, department?.name || 'N/A', FRONTEND_BASE_URL);
+            sendEmail({
+              to: admin.email,
+              subject: emailTemplate.subject,
+              html: emailTemplate.html,
+              text: emailTemplate.text,
+            });
+          }
+        }
+      }
+
+      // Gap 2: Send email notification to VFAST team if the booking is approved by admin
+      if (booking.status === BookingStatus.APPROVED && role === UserRole.ADMIN) {
+        const vfastUsers = await this.getUsersByRole(UserRole.VFAST);
+        for (const vfastUser of vfastUsers) {
+          if (vfastUser.email) {
+            const emailTemplate = await bookingForAllocationEmailTemplate(booking, FRONTEND_BASE_URL);
+            sendEmail({
+              to: vfastUser.email,
+              subject: emailTemplate.subject,
+              html: emailTemplate.html,
+              text: emailTemplate.text,
+            });
+          }
+        }
+      }
+
+      // Gap 3: Send email notification to Department Approver if the booking is rejected by admin
+      if (booking.status === BookingStatus.PENDING_RECONSIDERATION && role === UserRole.ADMIN && currentBooking.departmentApproverId) {
+        const departmentApprover = await this.getUser(currentBooking.departmentApproverId);
+        if (departmentApprover && departmentApprover.email) {
+          const department = await this.getDepartment(booking.department_id);
+          const emailTemplate = await bookingRejectedByAdminEmailTemplate(booking, departmentApprover, department?.name || 'N/A', FRONTEND_BASE_URL);
+          sendEmail({
+            to: departmentApprover.email,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
+          });
+        }
       }
 
       return booking;
@@ -758,7 +836,19 @@ export class DatabaseStorage implements IStorage {
           .returning();
 
         await this.createAuditLog("bookings", updatedBooking.id.toString(), "allocate_room", undefined, `Room ${roomNumber} allocated`);
-        
+
+        // Send email notification
+        const user = await this.getUser(updatedBooking.userId);
+        if (user) {
+          const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, FRONTEND_BASE_URL);
+          sendEmail({
+            to: user.email,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
+          });
+        }
+
         await client.query('COMMIT');
         return updatedBooking;
       } catch (error: any) {

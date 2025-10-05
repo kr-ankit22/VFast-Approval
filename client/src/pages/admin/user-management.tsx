@@ -58,7 +58,9 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   confirmPassword: z.string().optional(),
   role: z.nativeEnum(UserRole),
-  phone: z.string().optional(),
+  phone: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), {
+    message: "Phone number must be 10 digits",
+  }),
   department: z.string({ required_error: "Department is required." }).min(1, "Department is required."),
   authMethod: z.enum(["Password", "Google"]),
 }).superRefine(({ confirmPassword, password, authMethod }, ctx) => {

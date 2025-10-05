@@ -3,6 +3,8 @@ import passport from "passport";
 import { IStorage } from "./storage";
 import bcrypt from 'bcrypt';
 import { sendEmail } from './email';
+import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate } from './email-templates';
+import { FRONTEND_BASE_URL } from './config';
 import { 
   insertBookingSchema, 
   departmentApprovalSchema, 
@@ -34,28 +36,10 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email format"),
   password: z.string().optional(),
-  confirmPassword: z.string().optional(),
   role: z.nativeEnum(UserRole),
   phone: z.string().optional(),
   department: z.string(),
   authMethod: z.enum(["Password", "Google"]),
-}).superRefine(({ confirmPassword, password, authMethod }, ctx) => {
-  if (authMethod === "Password") {
-    if (!password || password.length < 6) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["password"],
-        message: "Password must be at least 6 characters",
-      });
-    }
-    if (password !== confirmPassword) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["confirmPassword"],
-        message: "Passwords do not match",
-      });
-    }
-  }
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -80,7 +64,7 @@ const checkRole = (roles: UserRole[]) => {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<void> {
   app.get("/test", (req, res) => {
-    // // logger.info
+    logger.info
     res.send("Test successful!");
   });
 
@@ -94,11 +78,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     (req, res, next) => {
       passport.authenticate("google", (err: any, user: any, info: any) => {
         if (err) {
-          // logger.error({ err }, "Google Auth Error");
+          logger.error({ err }, "Google Auth Error");
           return res.redirect("/login?error=" + encodeURIComponent(err.message));
         }
         if (!user) {
-  // // logger.warn
+  logger.warn
           return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
         }
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
@@ -141,15 +125,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
         // Send welcome email
         try {
+          const emailTemplate = await welcomeEmailTemplate(newUser, FRONTEND_BASE_URL);
           sendEmail({
             to: newUser.email,
-            subject: "Welcome to VFast Booker!",
-            html: `<h1>Welcome, ${newUser.name}!</h1><p>Your account has been successfully created.</p><p>You can now log in to the VFast Booker application.</p>`,
-            text: `Welcome, ${newUser.name}! Your account has been successfully created. You can now log in to the VFast Booker application.`,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
           });
-          // logger.info({ email: newUser.email }, "Welcome email sent");
+          logger.info({ email: newUser.email }, "Welcome email sent");
         } catch (emailError) {
-          // logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
+          logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
           // Continue even if email fails, as user account is created
         }
 
@@ -333,6 +318,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Create a new user (Admin only)
   app.post("/api/admin/users", authenticateJwt, checkRole([UserRole.ADMIN]), async (req, res) => {
+    logger.info({ body: req.body }, "Admin user creation request body");
     try {
       const { name, email, password, authMethod, role, phone, department } = registerSchema.parse(req.body);
 
@@ -354,6 +340,21 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         phone,
         department_id: parseInt(department),
       });
+
+      // Send welcome email
+      try {
+        const emailTemplate = await welcomeEmailTemplate(newUser, FRONTEND_BASE_URL);
+        sendEmail({
+          to: newUser.email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        });
+        logger.info({ email: newUser.email }, "Welcome email sent to admin-created user");
+      } catch (emailError) {
+        logger.error({ err: emailError }, `Failed to send welcome email to ${newUser.email}`);
+        // Continue even if email fails, as user account is created
+      }
 
       res.status(201).json(newUser);
     } catch (error) {
@@ -585,16 +586,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       try {
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
+          const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, bookingUser, booking.status, 'Department Approver', FRONTEND_BASE_URL);
           sendEmail({
             to: bookingUser.email,
-            subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
-            html: `<h1>Booking Status Update</h1>\r\n                   <p>Dear ${bookingUser.name},</p>\r\n                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by the Department Approver.</p>\r\n                   ${booking.notes ? `<p>Notes from approver: ${booking.notes}</p>` : ''}\r\n                   <p>Thank you for using VFast Booker.</p>`,
-            text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by the Department Approver. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
           });
-          // logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        // logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        logger.error({ err: emailError }, `Failed to send email for booking ${booking.id} status update`);
       }
 
       // logger.info(`[BACKEND] Booking ${bookingId} status updated to: ${status}`);
@@ -612,7 +613,6 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      // logger.info(req.body);
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
@@ -620,38 +620,61 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
       });
-      // logger.info("Booking data before creation:", bookingData);
+      logger.info({ bookingData }, "Booking data received before creation");
       const booking = await storage.createBooking(bookingData);
+      logger.info({ booking }, "Newly created booking");
+      logger.info({ bookingId: booking.id }, "Booking successfully created in database");
 
+      logger.info("Attempting to send email notifications...");
       // Send email notification to Department Approver
       try {
-        const department = await storage.getDepartment(booking.departmentId);
-        if (department && department.approverId) {
-          const approver = await storage.getUser(department.approverId);
-          if (approver && approver.email) {
-            sendEmail({
-              to: approver.email,
-              subject: `New Booking Request #${booking.id} for ${department.name}`,
-              html: `<h1>New Booking Request</h1>
-                     <p>Dear ${approver.name},</p>
-                     <p>A new booking request #${booking.id} has been submitted for your department, ${department.name}.</p>
-                     <p>Please review the request in the VFast Booker application.</p>`,
-              text: `Dear ${approver.name}, A new booking request #${booking.id} has been submitted for your department, ${department.name}. Please review the request in the VFast Booker application.`,
-            });
-            // logger.info(`Email sent to Department Approver ${approver.email} for new booking ${booking.id}.`);
+        const department = await storage.getDepartment(booking.department_id);
+        logger.info({ department }, "Department fetched for booking");
+        if (department) {
+          const approvers = await storage.getDepartmentApprovers(department.id);
+          logger.info({ approversCount: approvers.length, approvers: approvers.map(a => a.email) }, "Department approvers fetched");
+          for (const approver of approvers) {
+            if (approver.email) {
+              const emailTemplate = await newBookingRequestEmailTemplate(booking, approver, department.name, FRONTEND_BASE_URL);
+              logger.info({ to: approver.email, subject: emailTemplate.subject }, "Attempting to send email to approver");
+              sendEmail({
+                to: approver.email,
+                subject: emailTemplate.subject,
+                html: emailTemplate.html,
+                text: emailTemplate.text,
+              });
+              logger.info({ to: approver.email }, "Email sent to approver");
+            }
           }
         }
       } catch (emailError) {
-        // logger.error(`Failed to send email to Department Approver for new booking ${booking.id}:`, emailError);
+        logger.error({ err: emailError }, `Failed to send email to Department Approver for new booking ${booking.id}`);
       }
       res.status(201).json(booking);
+
+      // Send booking created email to the requestor
+      try {
+        const bookingUser = await storage.getUser(booking.userId);
+        if (bookingUser && bookingUser.email) {
+          const emailTemplate = await bookingCreatedEmailTemplate(booking, bookingUser, FRONTEND_BASE_URL);
+          sendEmail({
+            to: bookingUser.email,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
+          });
+          logger.info({ email: bookingUser.email, bookingId: booking.id }, "Booking created email sent to requestor");
+        }
+      } catch (emailError) {
+        logger.error({ err: emailError }, `Failed to send booking created email to requestor for booking ${booking.id}`);
+      }
     } catch (error) {
-      // logger.error("Booking creation error:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      res.status(500).json({ message: "Failed to create booking" });
+      logger.error({ err: error }, "Error creating booking");
+      res.status(500).json({ message: "Failed to create booking." });
     }
   });
 
@@ -679,20 +702,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       try {
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
+          const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, bookingUser, booking.status, 'Administrator', FRONTEND_BASE_URL);
           sendEmail({
             to: bookingUser.email,
-            subject: `Your Booking #${booking.id} Status Update: ${booking.status}`,
-            html: `<h1>Booking Status Update</h1>
-                   <p>Dear ${bookingUser.name},</p>
-                   <p>Your booking request #${booking.id} has been <strong>${booking.status}</strong> by an Administrator.</p>
-                   ${booking.notes ? `<p>Notes from administrator: ${booking.notes}</p>` : ''}
-                   <p>Thank you for using VFast Booker.</p>`,
-            text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been ${booking.status} by an Administrator. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
+            text: emailTemplate.text,
           });
-          // logger.info(`Email sent to ${bookingUser.email} for booking ${booking.id} status update.`);
         }
       } catch (emailError) {
-        // logger.error(`Failed to send email for booking ${booking.id} status update:`, emailError);
+        logger.error({ err: emailError }, `Failed to send email for booking ${booking.id} status update`);
       }
       
       res.json(booking);
@@ -738,6 +757,28 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
       if (!booking) {
         return res.status(404).json({ message: "Booking not found or not eligible for reconsideration" });
+      }
+
+      // Send email notification to Department Approver
+      try {
+        const department = await storage.getDepartment(booking.department_id);
+        if (department) {
+          const approvers = await storage.getDepartmentApprovers(department.id);
+          for (const approver of approvers) {
+            if (approver.email) {
+              const emailTemplate = await bookingResubmittedEmailTemplate(booking, approver, department.name, FRONTEND_BASE_URL);
+              sendEmail({
+                to: approver.email,
+                subject: emailTemplate.subject,
+                html: emailTemplate.html,
+                text: emailTemplate.text,
+              });
+              logger.info({ to: approver.email, bookingId: booking.id }, "Booking resubmitted email sent to approver");
+            }
+          }
+        }
+      } catch (emailError) {
+        logger.error({ err: emailError }, `Failed to send resubmitted email to Department Approver for booking ${booking.id}`);
       }
 
       res.json(booking);
@@ -1069,21 +1110,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             try {
               const bookingUser = await storage.getUser(booking.userId);
               if (bookingUser && bookingUser.email) {
+                const emailTemplate = await roomAllocatedEmailTemplate(booking, bookingUser, FRONTEND_BASE_URL);
                 sendEmail({
                   to: bookingUser.email,
-                  subject: `Your Booking #${booking.id} - Room Allocated!`,
-                  html: `<h1>Room Allocation Confirmation</h1>
-                         <p>Dear ${bookingUser.name},</p>
-                         <p>Your booking request #${booking.id} has been successfully allocated a room.</p>
-                         <p>Room Number: <strong>${booking.roomNumber}</strong></p>
-                         ${booking.notes ? `<p>Notes: ${booking.notes}</p>` : ''}
-                         <p>Thank you for using VFast Booker.</p>`,
-                  text: `Dear ${bookingUser.name}, Your booking request #${booking.id} has been successfully allocated a room. Room Number: ${booking.roomNumber}. ${booking.notes ? `Notes: ${booking.notes}` : ''} Thank you for using VFast Booker.`,
+                  subject: emailTemplate.subject,
+                  html: emailTemplate.html,
+                  text: emailTemplate.text,
                 });
-                // logger.info(`Email sent to booking user ${bookingUser.email} for room allocation of booking ${booking.id}.`);
               }
             } catch (emailError) {
-              // logger.error(`Failed to send email to booking user for room allocation of booking ${booking.id}:`, emailError);
+              logger.error({ err: emailError }, `Failed to send email to booking user for room allocation of booking ${booking.id}`);
             }
       
             res.json(booking);    } catch (error) {
