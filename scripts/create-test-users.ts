@@ -52,6 +52,14 @@ async function createTestUsers() {
       role: UserRole.VFAST,
       phone: "+91 98765 43212",
       department_id: 3,
+    },
+    {
+      name: "Department Approver",
+      email: "approver@example.com",
+      password: await hashPassword("password123"),
+      role: UserRole.DEPARTMENT_APPROVER,
+      phone: "+91 98765 43213",
+      department_id: 1,
     }
   ];
   

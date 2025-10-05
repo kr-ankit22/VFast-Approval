@@ -9,6 +9,7 @@ const logger = pino({
       ignore: 'pid,hostname',
     },
   },
+  level: 'info', // Ensure info level logs are shown
 });
 
 export default logger;

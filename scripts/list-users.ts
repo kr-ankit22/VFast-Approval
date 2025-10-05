@@ -18,6 +18,7 @@ async function listUsers() {
       console.log(`- Name: ${user.name}`);
       console.log(`  Email: ${user.email}`);
       console.log(`  Role: ${user.role}`);
+      console.log(`  Department ID: ${user.department_id}`);
       if (user.email.endsWith('@example.com')) {
         console.log(`  Password: password123`);
       } else {

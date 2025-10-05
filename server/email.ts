@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import logger from './logger';
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -19,14 +20,26 @@ interface EmailOptions {
 
 export async function sendEmail(options: EmailOptions) {
   try {
+    logger.info({ to: options.to, subject: options.subject }, "Attempting to send email");
     const info = await transporter.sendMail({
       from: `"VFast Booker" <${process.env.EMAIL_FROM}>`,
-      ...options,
+      to: options.to,
+      subject: options.subject,
+      alternatives: [
+        {
+          contentType: 'text/plain',
+          content: options.text,
+        },
+        {
+          contentType: 'text/html; charset=UTF-8',
+          content: options.html,
+        },
+      ],
     });
-    console.log('Email sent: %s', info.messageId);
+    logger.info({ messageId: info.messageId, response: info.response, to: options.to, subject: options.subject }, "Email sent successfully");
     return info;
-  } catch (error) {
-    console.error('Error sending email:', error);
+  } catch (error: any) {
+    logger.error({ err: error, to: options.to, subject: options.subject }, "Error sending email");
     throw new Error('Failed to send email');
   }
 }
