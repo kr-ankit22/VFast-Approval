@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         // Send welcome email
         try {
           const emailTemplate = await welcomeEmailTemplate(newUser, config.frontendLoginUrl);
-          sendEmail({
+          await sendEmail({
             to: newUser.email,
             subject: emailTemplate.subject,
             html: emailTemplate.html,
@@ -344,7 +344,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       // Send welcome email
       try {
         const emailTemplate = await welcomeEmailTemplate(newUser, config.frontendLoginUrl);
-        sendEmail({
+        await sendEmail({
           to: newUser.email,
           subject: emailTemplate.subject,
           html: emailTemplate.html,
@@ -587,7 +587,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
           const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, bookingUser, booking.status, 'Department Approver', config.frontendLoginUrl);
-          sendEmail({
+          await sendEmail({
             to: bookingUser.email,
             subject: emailTemplate.subject,
             html: emailTemplate.html,
@@ -637,7 +637,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
             if (approver.email) {
               const emailTemplate = await newBookingRequestEmailTemplate(booking, approver, department.name, config.frontendLoginUrl);
               logger.info({ to: approver.email, subject: emailTemplate.subject }, "Attempting to send email to approver");
-              sendEmail({
+              await sendEmail({
                 to: approver.email,
                 subject: emailTemplate.subject,
                 html: emailTemplate.html,
@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
           const emailTemplate = await bookingCreatedEmailTemplate(booking, bookingUser, config.frontendLoginUrl);
-          sendEmail({
+          await sendEmail({
             to: bookingUser.email,
             subject: emailTemplate.subject,
             html: emailTemplate.html,
@@ -703,7 +703,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         const bookingUser = await storage.getUser(booking.userId);
         if (bookingUser && bookingUser.email) {
           const emailTemplate = await bookingStatusUpdateEmailTemplate(booking, bookingUser, booking.status, 'Administrator', config.frontendLoginUrl);
-          sendEmail({
+          await sendEmail({
             to: bookingUser.email,
             subject: emailTemplate.subject,
             html: emailTemplate.html,
@@ -767,7 +767,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
           for (const approver of approvers) {
             if (approver.email) {
               const emailTemplate = await bookingResubmittedEmailTemplate(booking, approver, department.name, config.frontendLoginUrl);
-              sendEmail({
+              await sendEmail({
                 to: approver.email,
                 subject: emailTemplate.subject,
                 html: emailTemplate.html,
@@ -1111,7 +1111,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
               const bookingUser = await storage.getUser(booking.userId);
               if (bookingUser && bookingUser.email) {
                 const emailTemplate = await roomAllocatedEmailTemplate(booking, bookingUser, config.frontendLoginUrl);
-                sendEmail({
+                await sendEmail({
                   to: bookingUser.email,
                   subject: emailTemplate.subject,
                   html: emailTemplate.html,
