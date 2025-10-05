@@ -4,6 +4,3 @@
 
 [build.environment]
   NODE_VERSION = "18"
-
-[secrets_scan]
-  omit_paths = ["server/config.ts"]
