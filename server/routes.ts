@@ -650,7 +650,6 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       } catch (emailError) {
         logger.error({ err: emailError }, `Failed to send email to Department Approver for new booking ${booking.id}`);
       }
-      res.status(201).json(booking);
 
       // Send booking created email to the requestor
       try {
@@ -668,7 +667,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       } catch (emailError) {
         logger.error({ err: emailError }, `Failed to send booking created email to requestor for booking ${booking.id}`);
       }
-    } catch (error) {
+
+      res.status(201).json(booking);    } catch (error) {
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
