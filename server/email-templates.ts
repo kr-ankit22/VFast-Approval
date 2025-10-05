@@ -1,16 +1,13 @@
 import { User, Booking, Room, BookingStatus } from "@shared/schema";
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 import { config } from '../shared/env';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const welcomeEmailTemplate = async (user: User, loginUrl: string) => {
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'welcome.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'welcome.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{name}}', user.name).replace('{{loginUrl}}', loginPageUrl);
@@ -26,7 +23,7 @@ export const newBookingRequestEmailTemplate = async (booking: Booking, approver:
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/department/requests`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'new-booking-request.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'new-booking-request.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{approverName}}', approver.name)
@@ -46,7 +43,7 @@ export const bookingStatusUpdateEmailTemplate = async (booking: Booking, user: U
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/booking/history`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'booking-status-update.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-status-update.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{userName}}', user.name)
@@ -67,7 +64,7 @@ export const roomAllocatedEmailTemplate = async (booking: Booking, user: User, l
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/booking/history`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'room-allocated.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'room-allocated.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{userName}}', user.name)
@@ -87,7 +84,7 @@ export const bookingCreatedEmailTemplate = async (booking: Booking, user: User, 
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/booking/history`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'booking-created.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-created.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{name}}', user.name)
@@ -106,7 +103,7 @@ export const bookingForAllocationEmailTemplate = async (booking: Booking, loginU
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const allocationUrl = `${appBaseUrl}/vfast/workflow`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'booking-for-allocation.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-for-allocation.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{bookingId}}', booking.id.toString())
@@ -124,7 +121,7 @@ export const bookingRejectedByAdminEmailTemplate = async (booking: Booking, appr
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/department/requests`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'booking-rejected-by-admin.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-rejected-by-admin.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{approverName}}', approver.name)
@@ -144,7 +141,7 @@ export const bookingResubmittedEmailTemplate = async (booking: Booking, approver
   const appBaseUrl = config.frontendAppUrl;
   const loginPageUrl = config.frontendLoginUrl;
   const bookingUrl = `${appBaseUrl}/department/requests`;
-  const templatePath = path.join(__dirname, 'email-templates', 'html', 'booking-resubmitted.html');
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-resubmitted.html');
   let html = await fs.readFile(templatePath, 'utf-8');
 
   html = html.replace('{{approverName}}', approver.name)
