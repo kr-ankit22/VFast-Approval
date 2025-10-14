@@ -24,15 +24,7 @@ interface BookingDetailsModalProps {
   onAllocate?: (booking: any) => void;
 }
 
-// Get room type display name
-const getRoomTypeDisplay = (type: string) => {
-  const types: Record<string, string> = {
-    "single": "Single Room",
-    "double": "Double Room",
-    "deluxe": "Deluxe Room",
-  };
-  return types[type] || type;
-};
+
 
 const BookingInfoCard: React.FC<{booking: any}> = ({ booking }) => (
   <Card>
@@ -80,7 +72,7 @@ const BookingInfoCard: React.FC<{booking: any}> = ({ booking }) => (
 const DepartmentAndRoomCard: React.FC<{booking: any}> = ({ booking }) => (
   <Card>
     <CardHeader>
-      <CardTitle>Department & Room</CardTitle>
+      <CardTitle>Department & Rooms</CardTitle>
     </CardHeader>
     <CardContent>
       <div className="flex items-start space-x-3">
@@ -96,9 +88,14 @@ const DepartmentAndRoomCard: React.FC<{booking: any}> = ({ booking }) => (
             </p>
           )}
           {booking.roomNumber && (
-            <p className="text-gray-600 mt-2">
-              Assigned Room: <span className="font-medium bg-gray-100 px-2 py-1 rounded">{booking.roomNumber} ({getRoomTypeDisplay(booking.roomType)})</span>
-            </p>
+            <div className="text-gray-600 mt-2">
+              <p className="font-medium">Assigned Rooms:</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {booking.roomNumber.split(',').map((room: string) => (
+                  <span key={room} className="font-medium bg-gray-100 px-2 py-1 rounded">{room.trim()}</span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

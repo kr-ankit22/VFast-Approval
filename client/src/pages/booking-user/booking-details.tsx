@@ -137,10 +137,12 @@ export default function BookingDetailsPage() {
               <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-primary mt-0.5" />
                 <div>
-                  <p className="font-medium">Room Details</p>
-                  <p className="text-gray-600">
-                    Assigned Room: <span className="font-medium">{booking.roomNumber}</span>
-                  </p>
+                  <p className="font-medium">Assigned Rooms</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {booking.roomNumber.split(',').map((room: string) => (
+                      <span key={room} className="font-medium bg-gray-100 px-2 py-1 rounded">{room.trim()}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

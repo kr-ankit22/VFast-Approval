@@ -56,6 +56,7 @@ export interface IStorage {
   getBookingsByWorkflowStage(stage: WorkflowStage): Promise<Booking[]>;
   
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
+  allocateMultipleRooms(bookingId: number, roomIds: number[], notes?: string): Promise<Booking | undefined>;
   
   // Guest operations
   createGuest(guest: InsertGuest): Promise<Guest>;
@@ -862,6 +863,64 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Failed to allocate room.");
     }
   }
+
+  async allocateMultipleRooms(bookingId: number, roomIds: number[], notes?: string): Promise<Booking | undefined> {
+    const client = await this.poolClient.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Clear existing allocations for this booking
+      await this.dbClient.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+
+      // Allocate new rooms
+      const allocatedRoomNumbers: string[] = [];
+      for (const roomId of roomIds) {
+        const room = await this.getRoom(roomId);
+        if (!room || room.status !== RoomStatus.AVAILABLE) {
+          throw new Error(`Room with ID ${roomId} is not available.`);
+        }
+        await this.dbClient.insert(booking_rooms).values({ bookingId, roomId });
+        await this.dbClient.update(rooms).set({ status: RoomStatus.OCCUPIED }).where(eq(rooms.id, roomId));
+        allocatedRoomNumbers.push(room.roomNumber);
+      }
+
+      // Update booking status and notes
+      const bookingUpdateSet = {
+        status: BookingStatus.ALLOCATED,
+        vfastNotes: notes,
+        currentWorkflowStage: WorkflowStage.ALLOCATED,
+        roomNumber: allocatedRoomNumbers.join(', '), // For backward compatibility
+      };
+      const [updatedBooking] = await this.dbClient
+        .update(bookings)
+        .set(bookingUpdateSet)
+        .where(eq(bookings.id, bookingId))
+        .returning();
+
+      await this.createAuditLog("bookings", updatedBooking.id.toString(), "allocate_multiple_rooms", undefined, `Rooms ${allocatedRoomNumbers.join(', ')} allocated`);
+
+      // Send email notification
+      const user = await this.getUser(updatedBooking.userId);
+      if (user) {
+        const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, config.frontendLoginUrl);
+        sendEmail({
+          to: user.email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        });
+      }
+
+      await client.query('COMMIT');
+      return updatedBooking;
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      throw new Error(`Failed to allocate multiple rooms. Error: ${error.message}`);
+    } finally {
+      client.release();
+    }
+  }
+
 
   // Guest Operations
   async createGuest(insertGuest: InsertGuest): Promise<Guest> {

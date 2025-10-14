@@ -176,7 +176,7 @@ export type UpdateBookingStatus = z.infer<typeof updateBookingStatusSchema>;
 // Room allocation schema
 export const roomAllocationSchema = z.object({
   bookingId: z.number(),
-  roomNumber: z.string().min(1, "Room number is required"),
+  roomIds: z.array(z.number()).min(1, "At least one room must be selected"),
   notes: z.string().optional(),
 });
 
@@ -201,6 +201,12 @@ export const rooms = pgTable("rooms", {
 // Insert schema for room creation
 export const insertRoomSchema = createInsertSchema(rooms)
   .omit({ id: true });
+
+export const booking_rooms = pgTable("booking_rooms", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").notNull().references(() => bookings.id),
+  roomId: integer("room_id").notNull().references(() => rooms.id),
+});
 
 // Type definitions
 export type User = typeof users.$inferSelect;

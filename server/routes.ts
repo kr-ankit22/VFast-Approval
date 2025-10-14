@@ -1099,37 +1099,21 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   // Allocate room to booking (VFast users)
   app.patch("/api/bookings/:id/allocate", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
-      // logger.info(`[SERVER] Received allocation request for booking ID: ${req.params.id}`);
       const bookingId = parseInt(req.params.id);
-      const allocationData = roomAllocationSchema.parse({
+      const { roomIds, notes } = roomAllocationSchema.parse({
         bookingId: bookingId,
-        roomNumber: req.body.roomNumber,
+        roomIds: req.body.roomIds,
         notes: req.body.notes
       });
       
-            const booking = await storage.allocateRoom(allocationData);
+      const booking = await storage.allocateMultipleRooms(bookingId, roomIds, notes);
       
-            if (!booking) {
-              return res.status(404).json({ message: "Booking not found" });
-            }
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
       
-            // Send email notification to the booking user
-            try {
-              const bookingUser = await storage.getUser(booking.userId);
-              if (bookingUser && bookingUser.email) {
-                const emailTemplate = await roomAllocatedEmailTemplate(booking, bookingUser, config.frontendLoginUrl);
-                await sendEmail({
-                  to: bookingUser.email,
-                  subject: emailTemplate.subject,
-                  html: emailTemplate.html,
-                  text: emailTemplate.text,
-                });
-              }
-            } catch (emailError) {
-              logger.error({ err: emailError }, `Failed to send email to booking user for room allocation of booking ${booking.id}`);
-            }
-      
-            res.json(booking);    } catch (error) {
+      res.json(booking);
+    } catch (error) {
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });

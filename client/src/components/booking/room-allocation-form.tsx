@@ -45,7 +45,7 @@ type FormSchema = z.infer<typeof roomAllocationSchema>;
 
 export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocationFormProps) {
   const { toast } = useToast();
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedRooms, setSelectedRooms] = useState<Room[]>([]);
 
   const { data: availableRooms, isLoading: isLoadingRooms, isError: isRoomsError } = useQuery<Room[]>({
     queryKey: ['/api/rooms/available'],
@@ -55,7 +55,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     resolver: zodResolver(roomAllocationSchema),
     defaultValues: {
       bookingId: booking.id,
-      roomNumber: "",
+      roomIds: [],
       notes: "",
     },
   });
@@ -67,7 +67,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
       const res = await apiRequest(
         "PATCH",
         url,
-        data
+        { roomIds: data.roomIds, notes: data.notes }
       );
       return await res.json();
     },
@@ -75,11 +75,9 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
       await queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       // Also update the workflow stage of the specific booking
       await queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking.id}`] });
-      // Manually update the workflow stage in the backend
-      await apiRequest("PATCH", `/api/bookings/${booking.id}/workflow-stage`, { stage: WorkflowStage.ALLOCATED });
       toast({
-        title: "Room Allocated",
-        description: `Room ${form.getValues().roomNumber} has been successfully allocated.`,
+        title: "Rooms Allocated",
+        description: `The selected rooms have been successfully allocated.`,
       });
       if (onSuccess) onSuccess();
     },
@@ -92,10 +90,15 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
     },
   });
 
-  const handleRoomSelection = (roomNumber: string) => {
-    const room = availableRooms?.find(r => r.roomNumber === roomNumber) || null;
-    setSelectedRoom(room);
-    form.setValue("roomNumber", roomNumber);
+  const handleRoomSelection = (roomId: number) => {
+    const currentRoomIds = form.getValues("roomIds") || [];
+    const newRoomIds = currentRoomIds.includes(roomId)
+      ? currentRoomIds.filter(id => id !== roomId)
+      : [...currentRoomIds, roomId];
+    form.setValue("roomIds", newRoomIds);
+
+    const rooms = availableRooms?.filter(r => newRoomIds.includes(r.id)) || [];
+    setSelectedRooms(rooms);
   };
 
   function onSubmit(data: FormSchema) {
@@ -143,48 +146,75 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
 
           <FormField
             control={form.control}
-            name="roomNumber"
-            render={({ field }) => (
+            name="roomIds"
+            render={() => (
               <FormItem>
                 <FormLabel>Available Rooms</FormLabel>
-                <Select onValueChange={handleRoomSelection} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a room" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoadingRooms ? (
-                      <div className="flex items-center justify-center p-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      </div>
-                    ) : isRoomsError ? (
-                      <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
-                    ) : availableRooms && availableRooms.length > 0 ? (
-                      availableRooms.map((room) => (
-                        <SelectItem key={room.roomNumber} value={room.roomNumber}>
-                          {room.roomNumber} ({room.type}) - {room.status}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-gray-500 text-sm">No available rooms</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-3 gap-2">
+                  {isLoadingRooms ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  ) : isRoomsError ? (
+                    <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
+                  ) : availableRooms && availableRooms.length > 0 ? (
+                    availableRooms.map((room) => (
+                      <FormField
+                        key={room.id}
+                        control={form.control}
+                        name="roomIds"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={room.id}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value?.includes(room.id)}
+                                  onChange={(e) => {
+                                    const newRoomIds = e.target.checked
+                                      ? [...(field.value || []), room.id]
+                                      : (field.value || []).filter(
+                                          (value) => value !== room.id
+                                        );
+                                    field.onChange(newRoomIds);
+                                    const rooms = availableRooms?.filter(r => newRoomIds.includes(r.id)) || [];
+                                    setSelectedRooms(rooms);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {room.roomNumber} ({room.type})
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))
+                  ) : (
+                    <div className="p-2 text-gray-500 text-sm">No available rooms</div>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {selectedRoom && (
+          {selectedRooms.length > 0 && (
             <Card className="border-dashed">
               <CardHeader className="pb-2">
-                <CardTitle>Selected Room Details</CardTitle>
+                <CardTitle>Selected Rooms</CardTitle>
               </CardHeader>
               <CardContent>
-                <p><strong>Type:</strong> {selectedRoom.type}</p>
-                <p><strong>Floor:</strong> {selectedRoom.floor}</p>
-                <p className="break-words"><strong>Features:</strong> {selectedRoom.features?.join(", ")}</p>
+                {selectedRooms.map(room => (
+                  <div key={room.id}>
+                    <p><strong>Room:</strong> {room.roomNumber}</p>
+                    <p><strong>Type:</strong> {room.type}</p>
+                    <p><strong>Floor:</strong> {room.floor}</p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
@@ -219,7 +249,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
 
           <div className="flex justify-end space-x-4">
             <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
-            <Button type="submit" disabled={allocateRoomMutation.isPending || !form.getValues().roomNumber}>
+            <Button type="submit" disabled={allocateRoomMutation.isPending || (form.getValues().roomIds || []).length === 0}>
               {allocateRoomMutation.isPending ? "Allocating..." : "Assign Room"}
             </Button>
           </div>

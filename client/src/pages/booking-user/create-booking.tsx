@@ -161,12 +161,10 @@ export default function CreateBooking() {
                       <Input
                         type="number"
                         min={1}
-                        max={5}
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                       />
                     </FormControl>
-                    <FormDescription>Maximum 5 guests</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
