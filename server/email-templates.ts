@@ -29,6 +29,7 @@ export const newBookingRequestEmailTemplate = async (booking: Booking, approver:
   html = html.replace('{{approverName}}', approver.name)
              .replace('{{bookingId}}', booking.id.toString())
              .replace('{{departmentName}}', departmentName)
+             .replace('{{numberOfRooms}}', booking.numberOfRooms.toString())
              .replace('{{bookingUrl}}', bookingUrl)
              .replace('{{loginUrl}}', loginPageUrl);
 
@@ -49,6 +50,7 @@ export const bookingStatusUpdateEmailTemplate = async (booking: Booking, user: U
   html = html.replace('{{userName}}', user.name)
              .replace('{{bookingId}}', booking.id.toString())
              .replace('{{newStatus}}', newStatus)
+             .replace('{{numberOfRooms}}', booking.numberOfRooms.toString())
              .replace('{{approverRole}}', approverRole)
              .replace('{{bookingUrl}}', bookingUrl)
              .replace('{{loginUrl}}', loginPageUrl);
@@ -70,6 +72,7 @@ export const roomAllocatedEmailTemplate = async (booking: Booking, user: User, l
   html = html.replace('{{userName}}', user.name)
              .replace('{{bookingId}}', booking.id.toString())
              .replace('{{roomNumber}}', booking.roomNumber)
+             .replace('{{numberOfRooms}}', booking.numberOfRooms.toString())
              .replace('{{bookingUrl}}', bookingUrl)
              .replace('{{loginUrl}}', loginPageUrl);
 
@@ -89,6 +92,7 @@ export const bookingCreatedEmailTemplate = async (booking: Booking, user: User, 
 
   html = html.replace('{{name}}', user.name)
              .replace('{{bookingId}}', booking.id.toString())
+             .replace('{{numberOfRooms}}', booking.numberOfRooms.toString())
              .replace('{{bookingUrl}}', bookingUrl)
              .replace('{{loginUrl}}', loginPageUrl);
 

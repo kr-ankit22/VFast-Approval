@@ -1,0 +1,1 @@
+ALTER TABLE "bookings" ADD COLUMN "number_of_rooms" integer DEFAULT 1 NOT NULL;

@@ -94,6 +94,7 @@ export const bookings = pgTable("bookings", {
   userId: integer("user_id").notNull().references(() => users.id),
   purpose: text("purpose").notNull(),
   guestCount: integer("guest_count").notNull(),
+  numberOfRooms: integer("number_of_rooms").notNull().default(1),
   checkInDate: timestamp("check_in_date").notNull(),
   checkOutDate: timestamp("check_out_date").notNull(),
   department_id: integer("department_id").notNull().references(() => departments.id),

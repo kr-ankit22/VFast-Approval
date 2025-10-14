@@ -117,6 +117,9 @@ export default function BookingDetailsPage() {
                 <p className="text-gray-600">
                   Number of Guests: {booking.guestCount}
                 </p>
+                <p className="text-gray-600">
+                  Number of Rooms: {booking.numberOfRooms}
+                </p>
               </div>
             </div>
 

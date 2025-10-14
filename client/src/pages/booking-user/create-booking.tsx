@@ -37,7 +37,8 @@ const bookingFormSchema = insertBookingSchema.extend({
   department_id: z.coerce.number().min(1, "Department is required"),
   checkInDate: z.date(),
   checkOutDate: z.date(),
-}).omit({ userId: true });
+  numberOfRooms: z.coerce.number().min(1, "At least one room is required"),
+});
 
 type FormValues = z.infer<typeof bookingFormSchema>;
 
@@ -60,6 +61,7 @@ export default function CreateBooking() {
   const defaultValues: Partial<FormValues> = {
     purpose: "",
     guestCount: 1,
+    numberOfRooms: 1,
     specialRequests: "",
     department_id: undefined,
     checkInDate: undefined,
@@ -165,6 +167,26 @@ export default function CreateBooking() {
                       />
                     </FormControl>
                     <FormDescription>Maximum 5 guests</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="numberOfRooms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Rooms</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                      />
+                    </FormControl>
+                    <FormDescription>Number of rooms you want to book</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
