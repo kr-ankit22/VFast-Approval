@@ -139,7 +139,7 @@ export default function VFastDashboard() {
 
         <TabsContent value="overview" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 overflow-x-auto">
               <Card>
                 <CardHeader>
                   <CardTitle>Approved Bookings Needing Allocation</CardTitle>
@@ -249,7 +249,8 @@ export default function VFastDashboard() {
         </TabsContent>
 
         <TabsContent value="recent" className="mt-4">
-          <Card>
+          <div className="overflow-x-auto">
+            <Card>
             <CardHeader>
               <CardTitle>Recent Booking Requests</CardTitle>
             </CardHeader>
