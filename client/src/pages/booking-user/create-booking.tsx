@@ -38,7 +38,7 @@ const bookingFormSchema = insertBookingSchema.extend({
   checkInDate: z.date(),
   checkOutDate: z.date(),
   numberOfRooms: z.coerce.number().min(1, "At least one room is required"),
-});
+}).omit({ userId: true });
 
 type FormValues = z.infer<typeof bookingFormSchema>;
 
@@ -161,6 +161,7 @@ export default function CreateBooking() {
                       <Input
                         type="number"
                         min={1}
+                        className="w-24"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                       />
@@ -180,6 +181,7 @@ export default function CreateBooking() {
                       <Input
                         type="number"
                         min={1}
+                        className="w-24"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                       />
