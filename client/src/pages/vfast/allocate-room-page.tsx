@@ -11,7 +11,12 @@ import BookingJourney from "@/components/booking/booking-journey";
 import RoomAllocationForm from "@/components/booking/room-allocation-form";
 import MinimalRoomCalendar from "@/components/booking/minimal-room-calendar";
 import { Calendar, Users, MapPin, FileText } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 
 
@@ -129,6 +134,8 @@ const NotesCard: React.FC<{booking: any}> = ({ booking }) => (
 export default function AllocateRoomPage() {
   const params = useParams<{ id: string }>();
   const bookingId = params.id;
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [cancelNotes, setCancelNotes] = useState("");
 
   const { data: booking, isLoading, isError } = useQuery<Booking>({
     queryKey: [`/api/bookings/${bookingId}`],
@@ -140,6 +147,29 @@ export default function AllocateRoomPage() {
       return res.json();
     },
     enabled: !!bookingId,
+  });
+
+  const cancelAllocationMutation = useMutation({
+    mutationFn: async (data: { notes?: string }) => {
+      const res = await apiRequest("POST", `/api/bookings/${bookingId}/cancel-allocation`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+      toast({
+        title: "Allocation Canceled",
+        description: "The room allocation has been canceled and the booking has been sent for reconsideration.",
+      });
+      setIsCancelDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to cancel allocation",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: userDetails, isLoading: isLoadingUserDetails } = useQuery<User>({
@@ -248,9 +278,42 @@ export default function AllocateRoomPage() {
             <CardContent>
               <RoomAllocationForm booking={booking} onSuccess={() => { /* Handle success, e.g., navigate back */ }} />
             </CardContent>
+            {booking.status === "allocated" && (
+              <CardFooter>
+                <Button variant="destructive" onClick={() => setIsCancelDialogOpen(true)}>Cancel Allocation</Button>
+              </CardFooter>
+            )}
           </Card>
         </div>
       </div>
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Room Allocation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel the room allocation for this booking? This will send the booking back to the requestor for reconsideration.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium">Reason for Cancellation (Optional)</label>
+            <Textarea
+              className="mt-2"
+              placeholder="Add any notes for the requestor..."
+              value={cancelNotes}
+              onChange={(e) => setCancelNotes(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelAllocationMutation.mutate({ notes: cancelNotes })}
+              disabled={cancelAllocationMutation.isPending}
+            >
+              {cancelAllocationMutation.isPending ? "Canceling..." : "Confirm Cancellation"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

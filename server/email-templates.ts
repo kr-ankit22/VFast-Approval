@@ -160,3 +160,23 @@ export const bookingResubmittedEmailTemplate = async (booking: Booking, approver
     text: `Hi ${approver.name},\n\nA booking request #${booking.id} for the ${departmentName} department has been resubmitted for your approval.\n\nPlease review the request by visiting: ${bookingUrl}`,
   };
 };
+
+export const bookingAllocationCanceledEmailTemplate = async (booking: Booking, user: User, notes: string, loginUrl: string) => {
+  const appBaseUrl = config.frontendAppUrl;
+  const loginPageUrl = config.frontendLoginUrl;
+  const bookingUrl = `${appBaseUrl}/booking/${booking.id}`;
+  const templatePath = path.join(process.cwd(), 'server', 'email-templates', 'html', 'booking-allocation-canceled.html');
+  let html = await fs.readFile(templatePath, 'utf-8');
+
+  html = html.replace('{{userName}}', user.name)
+             .replace('{{bookingId}}', booking.id.toString())
+             .replace('{{notes}}', notes)
+             .replace('{{bookingUrl}}', bookingUrl)
+             .replace('{{loginUrl}}', loginPageUrl);
+
+  return {
+    subject: `Booking Allocation Canceled for Booking #${booking.id}`,
+    html,
+    text: `Dear ${user.name},\n\nThe room allocation for your booking request #${booking.id} has been canceled.\n\nReason: ${notes}\n\nPlease review your booking and resubmit it for approval by visiting: ${bookingUrl}`,
+  };
+};

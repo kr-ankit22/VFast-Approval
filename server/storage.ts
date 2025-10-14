@@ -22,7 +22,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
 import { sendEmail } from "./email";
-import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate } from './email-templates';
+import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate, bookingAllocationCanceledEmailTemplate } from './email-templates';
 import { FRONTEND_BASE_URL } from './config';
 
 import logger from "./logger";
@@ -57,6 +57,7 @@ export interface IStorage {
   
   allocateRoom(params: RoomAllocation): Promise<Booking | undefined>;
   allocateMultipleRooms(bookingId: number, roomIds: number[], notes?: string): Promise<Booking | undefined>;
+  cancelAllocation(bookingId: number, notes?: string): Promise<Booking | undefined>;
   
   // Guest operations
   createGuest(guest: InsertGuest): Promise<Guest>;
@@ -916,6 +917,65 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to allocate multiple rooms. Error: ${error.message}`);
+    } finally {
+      client.release();
+    }
+  }
+
+  async cancelAllocation(bookingId: number, notes?: string): Promise<Booking | undefined> {
+    const client = await this.poolClient.connect();
+    try {
+      await client.query('BEGIN');
+
+      const booking = await this.getBooking(bookingId);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      // Find the rooms that were allocated to this booking
+      const allocatedRooms = await this.dbClient.select().from(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+      const roomIds = allocatedRooms.map(r => r.roomId);
+
+      // Clear existing allocations for this booking
+      await this.dbClient.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+
+      // Update the status of the rooms to AVAILABLE
+      if (roomIds.length > 0) {
+        await this.dbClient.update(rooms).set({ status: RoomStatus.AVAILABLE }).where(inArray(rooms.id, roomIds));
+      }
+
+      // Update booking status and notes
+      const bookingUpdateSet = {
+        status: BookingStatus.PENDING_RECONSIDERATION,
+        vfastNotes: `Allocation canceled: ${notes || 'No reason provided.'}`,
+        roomNumber: null,
+        currentWorkflowStage: WorkflowStage.REJECTED, // Or a new stage e.g., PENDING_REALLOCATION
+      };
+      const [updatedBooking] = await this.dbClient
+        .update(bookings)
+        .set(bookingUpdateSet)
+        .where(eq(bookings.id, bookingId))
+        .returning();
+
+      await this.createAuditLog("bookings", updatedBooking.id.toString(), "cancel_allocation", undefined, `Allocation canceled: ${notes}`);
+
+      // Send email notification
+      const user = await this.getUser(updatedBooking.userId);
+      if (user) {
+        const emailTemplate = await bookingAllocationCanceledEmailTemplate(updatedBooking, user, notes || 'No reason provided.', config.frontendLoginUrl);
+        sendEmail({
+          to: user.email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        });
+      }
+
+      await client.query('COMMIT');
+      return updatedBooking;
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      throw new Error(`Failed to cancel allocation. Error: ${error.message}`);
     } finally {
       client.release();
     }

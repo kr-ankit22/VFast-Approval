@@ -1122,6 +1122,26 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  app.post("/api/bookings/:id/cancel-allocation", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const { notes } = req.body;
+      const booking = await storage.cancelAllocation(bookingId, notes);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to cancel allocation" });
+    }
+  });
+
   // Get approved bookings (for VFast room allocation)
   app.get("/api/bookings/approved", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     try {
