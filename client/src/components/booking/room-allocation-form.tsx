@@ -144,113 +144,99 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
             </CardContent>
           </Card>
 
-          <FormField
-            control={form.control}
-            name="roomIds"
-            render={() => (
-              <FormItem>
-                <FormLabel>Available Rooms</FormLabel>
-                <div className="grid grid-cols-3 gap-2">
-                  {isLoadingRooms ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <FormLabel>Available Rooms</FormLabel>
+              <div className="h-72 overflow-y-auto border rounded-md p-2 space-y-2">
+                {isLoadingRooms ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  </div>
+                ) : isRoomsError ? (
+                  <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
+                ) : availableRooms && availableRooms.length > 0 ? (
+                  availableRooms.map((room) => (
+                    <div key={room.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={form.getValues("roomIds")?.includes(room.id)}
+                          onChange={() => handleRoomSelection(room.id)}
+                          className="h-4 w-4"
+                        />
+                        <div>
+                          <span className="font-medium">{room.roomNumber}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({room.type})</span>
+                        </div>
+                      </div>
+                      <Badge variant={room.status === RoomStatus.AVAILABLE ? "default" : "destructive"}>
+                        {room.status}
+                      </Badge>
                     </div>
-                  ) : isRoomsError ? (
-                    <div className="p-2 text-red-500 text-sm">Failed to load rooms</div>
-                  ) : availableRooms && availableRooms.length > 0 ? (
-                    availableRooms.map((room) => (
-                      <FormField
-                        key={room.id}
-                        control={form.control}
-                        name="roomIds"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={room.id}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <input
-                                  type="checkbox"
-                                  checked={field.value?.includes(room.id)}
-                                  onChange={(e) => {
-                                    const newRoomIds = e.target.checked
-                                      ? [...(field.value || []), room.id]
-                                      : (field.value || []).filter(
-                                          (value) => value !== room.id
-                                        );
-                                    field.onChange(newRoomIds);
-                                    const rooms = availableRooms?.filter(r => newRoomIds.includes(r.id)) || [];
-                                    setSelectedRooms(rooms);
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {room.roomNumber} ({room.type})
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
-                      />
+                  ))
+                ) : (
+                  <div className="p-2 text-gray-500 text-sm">No available rooms</div>
+                )}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <FormLabel>Selected Rooms</FormLabel>
+                <div className="h-32 overflow-y-auto border rounded-md p-2 mt-2 flex flex-wrap gap-2">
+                  {selectedRooms.length > 0 ? (
+                    selectedRooms.map(room => (
+                      <Badge key={room.id} variant="secondary" className="flex items-center gap-2">
+                        <span>{room.roomNumber}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4"
+                          onClick={() => handleRoomSelection(room.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
                     ))
                   ) : (
-                    <div className="p-2 text-gray-500 text-sm">No available rooms</div>
+                    <p className="text-sm text-muted-foreground">No rooms selected</p>
                   )}
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {selectedRooms.length > 0 && (
-            <Card className="border-dashed">
-              <CardHeader className="pb-2">
-                <CardTitle>Selected Rooms</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {selectedRooms.map(room => (
-                  <div key={room.id}>
-                    <p><strong>Room:</strong> {room.roomNumber}</p>
-                    <p><strong>Type:</strong> {room.type}</p>
-                    <p><strong>Floor:</strong> {room.floor}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center space-x-1">
-                  <FormLabel>Allocation Notes</FormLabel>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Add any special instructions for check-in, room features, or other relevant details for the guest or VFast team.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <FormControl>
-                  <Textarea
-                    placeholder="Add any relevant notes..."
-                    rows={3}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              </div>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center space-x-1">
+                      <FormLabel>Allocation Notes</FormLabel>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Add any special instructions for check-in, room features, or other relevant details for the guest or VFast team.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add any relevant notes..."
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end space-x-4">
             <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
             <Button type="submit" disabled={allocateRoomMutation.isPending || (form.getValues().roomIds || []).length === 0}>
-              {allocateRoomMutation.isPending ? "Allocating..." : "Assign Room"}
+              {allocateRoomMutation.isPending ? "Allocating..." : "Assign Rooms"}
             </Button>
           </div>
         </form>
