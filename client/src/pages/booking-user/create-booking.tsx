@@ -151,46 +151,47 @@ export default function CreateBooking() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="guestCount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Number of Guests</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        className="w-24"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="guestCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Guests</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="w-24"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="numberOfRooms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Number of Rooms</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        className="w-24"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
-                      />
-                    </FormControl>
-                    <FormDescription>Number of rooms you want to book</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="numberOfRooms"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Rooms</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="w-24"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
