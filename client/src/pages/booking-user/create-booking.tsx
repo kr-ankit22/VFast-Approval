@@ -32,12 +32,14 @@ import { CalendarIcon, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+const MAX_ROOMS_PER_BOOKING = 10;
+
 const bookingFormSchema = insertBookingSchema.extend({
   purpose: z.string().min(1, "Purpose is required"),
   department_id: z.coerce.number().min(1, "Department is required"),
   checkInDate: z.date(),
   checkOutDate: z.date(),
-  numberOfRooms: z.coerce.number().min(1, "At least one room is required"),
+  numberOfRooms: z.coerce.number().min(1, "At least one room is required").max(MAX_ROOMS_PER_BOOKING, `You can book a maximum of ${MAX_ROOMS_PER_BOOKING} rooms`),
 }).omit({ userId: true });
 
 type FormValues = z.infer<typeof bookingFormSchema>;
@@ -182,6 +184,7 @@ export default function CreateBooking() {
                         <Input
                           type="number"
                           min={1}
+                          max={MAX_ROOMS_PER_BOOKING}
                           className="w-24"
                           {...field}
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10))}

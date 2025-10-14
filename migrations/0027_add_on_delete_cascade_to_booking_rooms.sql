@@ -1,0 +1,2 @@
+ALTER TABLE "booking_rooms" DROP CONSTRAINT "booking_rooms_booking_id_bookings_id_fk";
+ALTER TABLE "booking_rooms" ADD CONSTRAINT "booking_rooms_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "bookings"("id") ON DELETE cascade ON UPDATE no action;

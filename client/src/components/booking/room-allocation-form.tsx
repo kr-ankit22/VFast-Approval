@@ -147,7 +147,12 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <FormLabel>Available Rooms</FormLabel>
+              <div className="flex justify-between">
+                <FormLabel>Available Rooms</FormLabel>
+                <span className="text-sm text-muted-foreground">
+                  Selected {selectedRooms.length} of {booking.numberOfRooms}
+                </span>
+              </div>
               <div className="h-72 overflow-y-auto border rounded-md p-2 space-y-2">
                 {isLoadingRooms ? (
                   <div className="flex items-center justify-center p-4">
