@@ -305,6 +305,7 @@ export default function VFastDashboard() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="actions" className="mt-4">
