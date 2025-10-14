@@ -17,11 +17,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
     },
   },

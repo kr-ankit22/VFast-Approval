@@ -222,7 +222,7 @@ export default function BookingRequests() {
               showRequestType={true}
               renderActions={(booking) => (
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleViewBooking(booking)}>View</Button>
                   {user?.role === UserRole.ADMIN && booking.status === BookingStatus.PENDING_ADMIN_APPROVAL && (
                     <>
                       <Button size="sm" onClick={() => handleApproveBooking(booking)}>Approve</Button>

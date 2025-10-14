@@ -371,7 +371,8 @@ export class DatabaseStorage implements IStorage {
         keyHandedOver: bookings.keyHandedOver,
         firstCheckedInGuestName: bookings.firstCheckedInGuestName,
         departmentName: departments.name,
-      }).from(bookings).where(eq(bookings.isDeleted, false)).leftJoin(departments, eq(bookings.department_id, departments.id));
+        requester_name: users.name,
+      }).from(bookings).where(eq(bookings.isDeleted, false)).leftJoin(departments, eq(bookings.department_id, departments.id)).leftJoin(users, eq(bookings.userId, users.id));
     } catch (error: any) {
       // logger.error({ err: error }, "Error in getAllBookings");
       throw new Error("Failed to retrieve all bookings.");

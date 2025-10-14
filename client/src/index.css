@@ -27,6 +27,10 @@
   --success-foreground: 210 40% 98%;
   --ring: 215 20.2% 65.1%;
   --radius: 0.5rem;
+  --admin-badge: 0 84.2% 60.2%;
+  --vfast-badge: 212 100% 20%;
+  --approver-badge: 47 100% 50%;
+  --booking-badge: 142 69% 49%;
 }
 
 .dark {

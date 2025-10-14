@@ -22,7 +22,8 @@ import fs from 'fs/promises';
 import Papa from 'papaparse';
 import upload from './upload';
 import logger from './logger';
-import { authenticateJwt } from "./auth";
+import { authenticateJwt, loggingAuthenticateJwt } from "./auth";
+import { handleGenerateReport, handleExportReport } from "./src/reports";
 
 import jwt from 'jsonwebtoken';
 
@@ -47,17 +48,23 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 
 
+
+
 // Middleware to check user role
 const checkRole = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: Function) => {
+    console.log(`Backend: Entering checkRole middleware. Required roles: ${roles.join(', ')}. User role: ${(req.user as any)?.role}`);
     if (!req.user) {
+      console.log('Backend: checkRole - User not authenticated.');
       return res.status(401).json({ message: "Not authenticated" });
     }
     
     if (!roles.includes((req.user as any).role as UserRole)) {
+      console.log(`Backend: checkRole - User ${(req.user as any).id} with role ${(req.user as any).role} is NOT authorized.`);
       return res.status(403).json({ message: "Not authorized" });
     }
     
+    console.log(`Backend: checkRole - User ${(req.user as any).id} with role ${(req.user as any).role} IS authorized.`);
     next();
   };
 };
@@ -1325,6 +1332,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
+  app.post("/api/reports/generate", authenticateJwt, handleGenerateReport);
+  app.post("/api/reports/export", authenticateJwt, handleExportReport);
+
   // Get user details
   app.get("/api/users/:id", async (req, res) => {
     try {
@@ -1430,4 +1440,6 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.status(500).json({ message: "Failed to check out all guests" });
     }
   });
+
+  
 }

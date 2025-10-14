@@ -48,6 +48,10 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        "admin-badge": "hsl(var(--admin-badge))",
+        "vfast-badge": "hsl(var(--vfast-badge))",
+        "approver-badge": "hsl(var(--approver-badge))",
+        "booking-badge": "hsl(var(--booking-badge))",
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

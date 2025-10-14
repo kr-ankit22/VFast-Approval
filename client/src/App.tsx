@@ -34,6 +34,7 @@ import VFastRoomInventory from "@/pages/vfast/room-inventory";
 import RoomAvailabilityPage from "@/pages/vfast/room-availability";
 import GuestWorklistPage from "@/pages/vfast/guest-worklist";
 import ProfilePage from "@/pages/profile-page";
+import ReportsPage from "@/pages/reports";
 
 import ReconsiderBookingPage from "@/pages/booking-user/reconsider-booking";
 
@@ -167,6 +168,13 @@ function Router() {
       <ProtectedRoute path="/vfast/guest-worklist" role={UserRole.VFAST} component={({ user }) => (
         <DashboardLayout title="Guest Worklist" description="Manage guest check-ins and check-outs" role={user.role as UserRole}>
           <GuestWorklistPage />
+        </DashboardLayout>
+      )} />
+
+      {/* Reporting Route */}
+      <ProtectedRoute path="/reports" role={[UserRole.ADMIN, UserRole.VFAST, UserRole.DEPARTMENT_APPROVER]} component={({ user }) => (
+        <DashboardLayout title="Reporting" description="Generate and export reports" role={user.role as UserRole}>
+          <ReportsPage />
         </DashboardLayout>
       )} />
       

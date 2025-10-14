@@ -15,8 +15,10 @@ import {
   BookCheck,
   HelpCircle,
   Clock,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -34,6 +36,15 @@ export default function DashboardLayout({
   const { user, logoutMutation } = useAuth();
   const [location] = useLocation();
 
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+  const roleBadgeStyle: { [key in UserRole]: string } = {
+    [UserRole.ADMIN]: "bg-admin-badge text-white",
+    [UserRole.VFAST]: "bg-vfast-badge text-white",
+    [UserRole.DEPARTMENT_APPROVER]: "bg-approver-badge text-black",
+    [UserRole.BOOKING]: "bg-booking-badge text-white",
+  };
+
   const isActive = (path: string) => {
     return location === path || location.startsWith(`${path}/`);
   };
@@ -46,8 +57,8 @@ export default function DashboardLayout({
       icon: HomeIcon,
     },
     {
-      name: "Settings",
-      href: "/settings",
+      name: "Profile",
+      href: "/profile",
       icon: Settings,
     },
     {
@@ -97,6 +108,11 @@ export default function DashboardLayout({
         href: "/admin/user-provisioning",
         icon: Users,
       },
+      {
+        name: "Reporting",
+        href: "/reports",
+        icon: FileText,
+      },
     ],
     [UserRole.DEPARTMENT_APPROVER]: [
       {
@@ -108,6 +124,11 @@ export default function DashboardLayout({
         name: "Booking Requests",
         href: "/department/requests",
         icon: BookCheck,
+      },
+      {
+        name: "Reporting",
+        href: "/reports",
+        icon: FileText,
       },
     ],
     [UserRole.VFAST]: [
@@ -125,6 +146,11 @@ export default function DashboardLayout({
         name: "Guest Worklist",
         href: "/vfast/guest-worklist",
         icon: Users,
+      },
+      {
+        name: "Reporting",
+        href: "/reports",
+        icon: FileText,
       },
     ],
   };
@@ -210,6 +236,12 @@ export default function DashboardLayout({
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">{title}</h1>
             {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+            {user && (
+              <div className="mt-2 text-sm text-gray-500 flex items-center gap-x-2">
+                <span>Welcome, <span className="font-semibold text-gray-700">{user.name}</span></span>
+                <Badge className={roleBadgeStyle[user.role]}>{capitalize(user.role)}</Badge>
+              </div>
+            )}
           </div>
         </header>
 
