@@ -2,6 +2,9 @@
 import { apiRequest } from "./queryClient";
 
 const getBaseUrl = () => {
+  if (import.meta.env.PROD) {
+    return ""; // Use relative paths in production
+  }
   const port = import.meta.env.VITE_BACKEND_PORT || 5000;
   return `http://localhost:${port}`;
 };
