@@ -170,9 +170,7 @@ export default function RoomAllocationForm({ booking, onSuccess }: RoomAllocatio
                           <span className="text-xs text-muted-foreground ml-2">({room.type})</span>
                         </div>
                       </div>
-                      <Badge variant={room.status === RoomStatus.AVAILABLE ? "default" : "destructive"}>
-                        {room.status}
-                      </Badge>
+
                     </div>
                   ))
                 ) : (
