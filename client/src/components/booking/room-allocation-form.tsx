@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar, User, FileText, HelpCircle } from "lucide-react";
+import { Loader2, Calendar, User, FileText, HelpCircle, X } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import BookingJourney from "@/components/booking/booking-journey";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
