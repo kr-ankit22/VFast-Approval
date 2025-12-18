@@ -12,6 +12,7 @@ import { UserRole } from "@shared/schema";
 // Booking User Pages
 import BookingUserDashboard from "@/pages/booking-user/dashboard";
 import CreateBooking from "@/pages/booking-user/create-booking";
+import CreatePersonalBooking from "@/pages/booking-user/create-personal-booking";
 import BookingHistory from "@/pages/booking-user/booking-history";
 import BookingDetailsPage from "@/pages/booking-user/booking-details";
 
@@ -71,6 +72,11 @@ function Router() {
       <ProtectedRoute path="/booking/create" role={UserRole.BOOKING} component={({ user }) => (
         <DashboardLayout title="New Booking" description="Submit a new booking request" role={user.role as UserRole}>
           <CreateBooking />
+        </DashboardLayout>
+      )} />
+      <ProtectedRoute path="/booking/create-personal" role={UserRole.BOOKING} component={({ user }) => (
+        <DashboardLayout title="New Personal Booking" description="Submit a new personal booking request" role={user.role as UserRole}>
+          <CreatePersonalBooking />
         </DashboardLayout>
       )} />
       <ProtectedRoute path="/booking/history" role={UserRole.BOOKING} component={({ user }) => (

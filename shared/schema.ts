@@ -20,6 +20,12 @@ export enum BookingStatus {
   PENDING_RECONSIDERATION = "pending_reconsideration"
 }
 
+// Booking type enum
+export enum BookingType {
+  OFFICIAL = "official",
+  PERSONAL = "personal",
+}
+
 // Room type enum
 export enum RoomType {
   STANDARD = "standard"
@@ -93,11 +99,12 @@ export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   purpose: text("purpose").notNull(),
+  bookingType: text("booking_type").notNull().default(BookingType.OFFICIAL),
   guestCount: integer("guest_count").notNull(),
   numberOfRooms: integer("number_of_rooms").notNull().default(1),
   checkInDate: timestamp("check_in_date").notNull(),
   checkOutDate: timestamp("check_out_date").notNull(),
-  department_id: integer("department_id").notNull().references(() => departments.id),
+  department_id: integer("department_id").references(() => departments.id),
   specialRequests: text("special_requests"),
   status: text("status").notNull().default(BookingStatus.PENDING_DEPARTMENT_APPROVAL),
   roomNumber: text("room_number"),

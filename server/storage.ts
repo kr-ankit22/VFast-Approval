@@ -15,7 +15,8 @@ import {
   guests,
   roomMaintenance,
   guestNotes,
-  auditLogs
+  auditLogs,
+  booking_rooms
 } from "@shared/schema";
 import { eq, and, or, lt, gt, lte, gte, sql, inArray } from "drizzle-orm";
 import session from "express-session";
@@ -221,6 +222,7 @@ export class DatabaseStorage implements IStorage {
         id: bookings.id,
         userId: bookings.userId,
         purpose: bookings.purpose,
+        bookingType: bookings.bookingType,
         guestCount: bookings.guestCount,
         checkInDate: bookings.checkInDate,
         checkOutDate: bookings.checkOutDate,
@@ -262,6 +264,7 @@ export class DatabaseStorage implements IStorage {
         id: bookings.id,
         userId: bookings.userId,
         purpose: bookings.purpose,
+        bookingType: bookings.bookingType,
         guestCount: bookings.guestCount,
         checkInDate: bookings.checkInDate,
         checkOutDate: bookings.checkOutDate,
@@ -304,6 +307,7 @@ export class DatabaseStorage implements IStorage {
         id: bookings.id,
         userId: bookings.userId,
         purpose: bookings.purpose,
+        bookingType: bookings.bookingType,
         guestCount: bookings.guestCount,
         checkInDate: bookings.checkInDate,
         checkOutDate: bookings.checkOutDate,
@@ -346,6 +350,7 @@ export class DatabaseStorage implements IStorage {
         id: bookings.id,
         userId: bookings.userId,
         purpose: bookings.purpose,
+        bookingType: bookings.bookingType,
         guestCount: bookings.guestCount,
         checkInDate: bookings.checkInDate,
         checkOutDate: bookings.checkOutDate,
@@ -421,7 +426,10 @@ export class DatabaseStorage implements IStorage {
     try {
       const [booking] = await this.dbClient
         .insert(bookings)
-        .values({ ...insertBooking, currentWorkflowStage: WorkflowStage.PENDING_APPROVALS })
+        .values({ 
+          ...insertBooking, 
+          currentWorkflowStage: insertBooking.currentWorkflowStage || WorkflowStage.PENDING_APPROVALS 
+        })
         .returning();
       return booking;
     } catch (error: any) {
@@ -866,22 +874,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async allocateMultipleRooms(bookingId: number, roomIds: number[], notes?: string): Promise<Booking | undefined> {
-    const client = await this.poolClient.connect();
-    try {
-      await client.query('BEGIN');
-
+    return await this.dbClient.transaction(async (tx) => {
       // Clear existing allocations for this booking
-      await this.dbClient.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+      await tx.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
 
       // Allocate new rooms
       const allocatedRoomNumbers: string[] = [];
       for (const roomId of roomIds) {
-        const room = await this.getRoom(roomId);
+        // Use tx to check room availability to ensure we are in the same transaction snapshot
+        const [room] = await tx.select().from(rooms).where(eq(rooms.id, roomId));
+        
         if (!room || room.status !== RoomStatus.AVAILABLE) {
           throw new Error(`Room with ID ${roomId} is not available.`);
         }
-        await this.dbClient.insert(booking_rooms).values({ bookingId, roomId });
-        await this.dbClient.update(rooms).set({ status: RoomStatus.OCCUPIED }).where(eq(rooms.id, roomId));
+        await tx.insert(booking_rooms).values({ bookingId, roomId });
+        await tx.update(rooms).set({ status: RoomStatus.OCCUPIED }).where(eq(rooms.id, roomId));
         allocatedRoomNumbers.push(room.roomNumber);
       }
 
@@ -892,56 +899,61 @@ export class DatabaseStorage implements IStorage {
         currentWorkflowStage: WorkflowStage.ALLOCATED,
         roomNumber: allocatedRoomNumbers.join(', '), // For backward compatibility
       };
-      const [updatedBooking] = await this.dbClient
+      const [updatedBooking] = await tx
         .update(bookings)
         .set(bookingUpdateSet)
         .where(eq(bookings.id, bookingId))
         .returning();
 
-      await this.createAuditLog("bookings", updatedBooking.id.toString(), "allocate_multiple_rooms", undefined, `Rooms ${allocatedRoomNumbers.join(', ')} allocated`);
-
-      // Send email notification
-      const user = await this.getUser(updatedBooking.userId);
-      if (user) {
-        const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, config.frontendLoginUrl);
-        sendEmail({
-          to: user.email,
-          subject: emailTemplate.subject,
-          html: emailTemplate.html,
-          text: emailTemplate.text,
-        });
-      }
-
-      await client.query('COMMIT');
+      // Audit log (can be outside transaction or inside, ideally inside but storage.createAuditLog uses this.dbClient)
+      // For now, we'll accept it might not be strictly atomic with the transaction, or we'd need to refactor createAuditLog
+      // Since createAuditLog swallows errors, it's fine.
+      
+      // Send email notification (side effect, should be outside tx ideally, but kept here for simplicity as per original flow)
+      // We'll do it AFTER transaction commits successfully.
+      
       return updatedBooking;
-    } catch (error: any) {
-      await client.query('ROLLBACK');
-      throw new Error(`Failed to allocate multiple rooms. Error: ${error.message}`);
-    } finally {
-      client.release();
-    }
+    }).then(async (updatedBooking) => {
+        // Post-transaction actions
+        try {
+          await this.createAuditLog("bookings", updatedBooking.id.toString(), "allocate_multiple_rooms", undefined, `Rooms ${updatedBooking.roomNumber} allocated`);
+
+          const user = await this.getUser(updatedBooking.userId);
+          if (user) {
+            const emailTemplate = await roomAllocatedEmailTemplate(updatedBooking, user, config.frontendLoginUrl);
+            await sendEmail({
+              to: user.email,
+              subject: emailTemplate.subject,
+              html: emailTemplate.html,
+              text: emailTemplate.text,
+            });
+          }
+        } catch (error) {
+          logger.error({ err: error }, "Failed to perform post-allocation actions (audit log or email)");
+          // We do not re-throw here because the allocation transaction is already committed.
+          // The client should receive success.
+        }
+        return updatedBooking;
+    });
   }
 
   async cancelAllocation(bookingId: number, notes?: string): Promise<Booking | undefined> {
-    const client = await this.poolClient.connect();
-    try {
-      await client.query('BEGIN');
-
-      const booking = await this.getBooking(bookingId);
+    return await this.dbClient.transaction(async (tx) => {
+      const [booking] = await tx.select().from(bookings).where(eq(bookings.id, bookingId));
       if (!booking) {
         throw new Error("Booking not found");
       }
 
       // Find the rooms that were allocated to this booking
-      const allocatedRooms = await this.dbClient.select().from(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+      const allocatedRooms = await tx.select().from(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
       const roomIds = allocatedRooms.map(r => r.roomId);
 
       // Clear existing allocations for this booking
-      await this.dbClient.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
+      await tx.delete(booking_rooms).where(eq(booking_rooms.bookingId, bookingId));
 
       // Update the status of the rooms to AVAILABLE
       if (roomIds.length > 0) {
-        await this.dbClient.update(rooms).set({ status: RoomStatus.AVAILABLE }).where(inArray(rooms.id, roomIds));
+        await tx.update(rooms).set({ status: RoomStatus.AVAILABLE }).where(inArray(rooms.id, roomIds));
       }
 
       // Update booking status and notes
@@ -951,12 +963,14 @@ export class DatabaseStorage implements IStorage {
         roomNumber: null,
         currentWorkflowStage: WorkflowStage.REJECTED, // Or a new stage e.g., PENDING_REALLOCATION
       };
-      const [updatedBooking] = await this.dbClient
+      const [updatedBooking] = await tx
         .update(bookings)
         .set(bookingUpdateSet)
         .where(eq(bookings.id, bookingId))
         .returning();
 
+      return updatedBooking;
+    }).then(async (updatedBooking) => {
       await this.createAuditLog("bookings", updatedBooking.id.toString(), "cancel_allocation", undefined, `Allocation canceled: ${notes}`);
 
       // Send email notification
@@ -970,15 +984,8 @@ export class DatabaseStorage implements IStorage {
           text: emailTemplate.text,
         });
       }
-
-      await client.query('COMMIT');
       return updatedBooking;
-    } catch (error: any) {
-      await client.query('ROLLBACK');
-      throw new Error(`Failed to cancel allocation. Error: ${error.message}`);
-    } finally {
-      client.release();
-    }
+    });
   }
 
 
@@ -1210,6 +1217,7 @@ export class DatabaseStorage implements IStorage {
           id: bookings.id,
           userId: bookings.userId,
           purpose: bookings.purpose,
+          bookingType: bookings.bookingType,
           checkInDate: bookings.checkInDate,
           checkOutDate: bookings.checkOutDate,
           department_id: bookings.department_id,

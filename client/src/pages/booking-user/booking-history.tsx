@@ -1,7 +1,7 @@
 import { useGetMyBookings, useGetMyReconsiderationBookings } from "@/hooks/use-bookings";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Booking, BookingStatus, UserRole } from "@shared/schema";
+import { Booking, BookingStatus, UserRole, BookingType } from "@shared/schema";
 import { Link } from "wouter";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +74,14 @@ export default function BookingHistory() {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const renderBookingTypeBadge = (type: string) => {
+    return type === BookingType.PERSONAL ? (
+      <Badge variant="outline" className="border-purple-500 text-purple-500 bg-purple-50">Personal</Badge>
+    ) : (
+      <Badge variant="outline" className="border-blue-500 text-blue-500 bg-blue-50">Official</Badge>
+    );
   };
 
   // Filter and search bookings
@@ -231,6 +239,7 @@ export default function BookingHistory() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
@@ -244,6 +253,7 @@ export default function BookingHistory() {
                   <tbody className="divide-y divide-gray-200">
                     {myRequests.map((booking) => (
                       <tr key={booking.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 text-sm text-gray-900">{renderBookingTypeBadge(booking.bookingType)}</td>
                         <td className="px-4 py-4 text-sm text-gray-900">{booking.purpose}</td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           <div className="flex items-center">
@@ -258,7 +268,7 @@ export default function BookingHistory() {
                           </div>
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">{booking.guestCount}</td>
-                        <td className="px-4 py-4 text-sm text-gray-900">{booking.departmentName}</td>
+                        <td className="px-4 py-4 text-sm text-gray-900">{booking.departmentName || "-"}</td>
                         <td className="px-4 py-4 text-sm">{renderStatusBadge(booking.status as BookingStatus)}</td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           {booking.roomNumber || 

@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Clock,
   FileText,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +81,11 @@ export default function DashboardLayout({
         name: "New Booking",
         href: "/booking/create",
         icon: BookOpen,
+      },
+      {
+        name: "New Personal Booking",
+        href: "/booking/create-personal",
+        icon: UserCog,
       },
       {
         name: "My Bookings",

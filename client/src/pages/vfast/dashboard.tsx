@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, type Booking, type Room, RoomStatus } from "@shared/schema";
+import { UserRole, BookingStatus, type Booking, type Room, RoomStatus, BookingType } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import {
   BookCheck,
@@ -78,6 +78,14 @@ export default function VFastDashboard() {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const renderBookingTypeBadge = (type: string) => {
+    return type === BookingType.PERSONAL ? (
+      <Badge variant="outline" className="border-purple-500 text-purple-500 bg-purple-50">Personal</Badge>
+    ) : (
+      <Badge variant="outline" className="border-blue-500 text-blue-500 bg-blue-50">Official</Badge>
+    );
   };
 
   return (
@@ -159,6 +167,7 @@ export default function VFastDashboard() {
                         <thead>
                           <tr className="border-b">
                             <th className="text-left py-3 px-4 font-medium text-xs uppercase">ID</th>
+                            <th className="text-left py-3 px-4 font-medium text-xs uppercase">Type</th>
                             <th className="text-left py-3 px-4 font-medium text-xs uppercase">Purpose</th>
                             <th className="text-left py-3 px-4 font-medium text-xs uppercase">Department</th>
                             <th className="text-left py-3 px-4 font-medium text-xs uppercase">Check-in</th>
@@ -170,8 +179,9 @@ export default function VFastDashboard() {
                           {allBookings.filter(b => b.status === BookingStatus.APPROVED).slice(0, 5).map((booking) => (
                             <tr key={booking.id} className="border-b">
                               <td className="py-3 px-4">{booking.id}</td>
+                              <td className="py-3 px-4">{renderBookingTypeBadge(booking.bookingType)}</td>
                               <td className="py-3 px-4">{booking.purpose}</td>
-                              <td className="py-3 px-4">{booking.departmentName}</td>
+                              <td className="py-3 px-4">{booking.departmentName || "-"}</td>
                               <td className="py-3 px-4">{formatDate(new Date(booking.checkInDate))}</td>
                               <td className="py-3 px-4">{renderStatusBadge(booking.status)}</td>
                               <td className="py-3 px-4">
@@ -269,6 +279,7 @@ export default function VFastDashboard() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-4 font-medium text-xs uppercase">ID</th>
+                        <th className="text-left py-3 px-4 font-medium text-xs uppercase">Type</th>
                         <th className="text-left py-3 px-4 font-medium text-xs uppercase">Purpose</th>
                         <th className="text-left py-3 px-4 font-medium text-xs uppercase">Department</th>
                         <th className="text-left py-3 px-4 font-medium text-xs uppercase">Check-in</th>
@@ -280,8 +291,9 @@ export default function VFastDashboard() {
                       {allBookings.slice(0, 5).map((booking) => (
                         <tr key={booking.id} className="border-b">
                           <td className="py-3 px-4">{booking.id}</td>
+                          <td className="py-3 px-4">{renderBookingTypeBadge(booking.bookingType)}</td>
                           <td className="py-3 px-4">{booking.purpose}</td>
-                          <td className="py-3 px-4">{booking.departmentName}</td>
+                          <td className="py-3 px-4">{booking.departmentName || "-"}</td>
                           <td className="py-3 px-4">{formatDate(new Date(booking.checkInDate))}</td>
                           <td className="py-3 px-4">{renderStatusBadge(booking.status)}</td>
                           <td className="py-3 px-4">

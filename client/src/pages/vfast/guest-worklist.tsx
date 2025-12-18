@@ -1,9 +1,9 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { UserRole, BookingStatus, GuestCheckInStatus } from "@shared/schema";
+import { UserRole, BookingStatus, GuestCheckInStatus, BookingType } from "@shared/schema";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useGetGuestWorklist } from "@/hooks/use-bookings";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,9 +17,12 @@ import GuestNotesSection from "@/components/booking/guest-notes-section";
 import { useCheckInBooking, useCheckOutBooking } from "@/hooks/use-bookings";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BookingDetailsModal from "@/components/booking/booking-details-modal";
 
 export default function GuestWorklistPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const { data: bookings, isLoading, isError, error } = useGetGuestWorklist();
   const { toast } = useToast();
   const checkInBookingMutation = useCheckInBooking();
@@ -63,6 +66,19 @@ export default function GuestWorklistPage() {
 
   const handleCheckOutBooking = (bookingId: number) => {
     checkOutBookingMutation.mutate(bookingId);
+  };
+
+  const handleViewBooking = (booking: any) => {
+    setSelectedBooking(booking);
+    setIsViewModalOpen(true);
+  };
+
+  const renderBookingTypeBadge = (type: string) => {
+    return type === BookingType.PERSONAL ? (
+      <Badge variant="outline" className="border-purple-500 text-purple-500 bg-purple-50">Personal</Badge>
+    ) : (
+      <Badge variant="outline" className="border-blue-500 text-blue-500 bg-blue-50">Official</Badge>
+    );
   };
 
   const filteredBookings = getFilteredBookings();
@@ -117,6 +133,7 @@ export default function GuestWorklistPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Booking ID</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Guest Name</TableHead>
                     <TableHead>Guests</TableHead> {/* New column */}
                     <TableHead>Check-in</TableHead>
@@ -138,6 +155,7 @@ export default function GuestWorklistPage() {
                             : ''
                         }>
                           <TableCell className="font-medium">{booking.id}</TableCell>
+                          <TableCell>{renderBookingTypeBadge(booking.bookingType)}</TableCell>
                           <TableCell>{booking.firstCheckedInGuestName || booking.firstGuestName || booking.userName || 'N/A'}</TableCell> {/* Prioritize firstCheckedInGuestName */}
                           <TableCell>{booking.guestCount || 0}</TableCell> {/* Updated to use guestCount */}
                           <TableCell>{format(new Date(booking.checkInDate), "PPP")}</TableCell>
@@ -154,7 +172,9 @@ export default function GuestWorklistPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              
+                              <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)}>
+                                <FileText className="h-4 w-4" />
+                              </Button>
                               <CollapsibleTrigger asChild>
                                 <Button size="sm">Manage</Button>
                               </CollapsibleTrigger>
@@ -163,7 +183,7 @@ export default function GuestWorklistPage() {
                         </TableRow>
                         <CollapsibleContent asChild>
                           <tr>
-                            <td colSpan={8} className="p-4"> {/* colSpan updated to 8 */}
+                            <td colSpan={9} className="p-4"> {/* colSpan updated to 9 */}
                               {/* Directly render GuestManagementCard */}
                               <GuestManagementCard bookingId={booking.id} />
                             </td>
@@ -178,6 +198,15 @@ export default function GuestWorklistPage() {
           )}
         </CardContent>
       </Card>
+      
+      {selectedBooking && (
+        <BookingDetailsModal
+          booking={selectedBooking}
+          isOpen={isViewModalOpen}
+          onOpenChange={setIsViewModalOpen}
+          userRole={UserRole.VFAST}
+        />
+      )}
     </>
   );
 }

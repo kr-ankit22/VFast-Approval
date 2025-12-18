@@ -43,6 +43,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         return [
           { href: "/booking", icon: <Home size={18} />, label: "Dashboard" },
           { href: "/booking/create", icon: <PlusCircle size={18} />, label: "New Booking" },
+          { href: "/booking/create-personal", icon: <UserCog size={18} />, label: "New Personal Booking" },
           { href: "/booking/history", icon: <History size={18} />, label: "Booking History" },
           { href: "/booking/reconsider", icon: <RefreshCw size={18} />, label: "Reconsideration" },
           { href: "/profile", icon: <UserCog size={18} />, label: "Settings" }

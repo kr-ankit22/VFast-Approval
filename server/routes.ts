@@ -14,6 +14,7 @@ import {
   InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
   BookingStatus,
+  BookingType,
   users
 } from "@shared/schema";
 import { z, ZodError } from "zod";
@@ -620,42 +621,82 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+
+      const bookingType = req.body.bookingType || BookingType.OFFICIAL;
+
+      // Enforce department_id for official bookings
+      if (bookingType === BookingType.OFFICIAL && !req.body.department_id) {
+        return res.status(400).json({ message: "Department is required for official bookings" });
+      }
+
+      const initialStatus = bookingType === BookingType.PERSONAL 
+        ? BookingStatus.APPROVED 
+        : BookingStatus.PENDING_DEPARTMENT_APPROVAL;
+
+      const initialWorkflowStage = bookingType === BookingType.PERSONAL
+        ? WorkflowStage.ALLOCATION_PENDING
+        : WorkflowStage.PENDING_APPROVALS;
+
       const bookingData = insertBookingSchema.parse({
         ...req.body,
         userId: req.user.id,
-        status: BookingStatus.PENDING_DEPARTMENT_APPROVAL, // Explicitly set status
+        bookingType, // Ensure bookingType is passed
+        status: initialStatus,
+        currentWorkflowStage: initialWorkflowStage,
         checkInDate: new Date(req.body.checkInDate),
         checkOutDate: new Date(req.body.checkOutDate)
       });
-      logger.info({ bookingData }, "Booking data received before creation");
+
       const booking = await storage.createBooking(bookingData);
-      logger.info({ booking }, "Newly created booking");
       logger.info({ bookingId: booking.id }, "Booking successfully created in database");
 
       logger.info("Attempting to send email notifications...");
-      // Send email notification to Department Approver
-      try {
-        const department = await storage.getDepartment(booking.department_id);
-        logger.info({ department }, "Department fetched for booking");
-        if (department) {
-          const approvers = await storage.getDepartmentApprovers(department.id);
-          logger.info({ approversCount: approvers.length, approvers: approvers.map(a => a.email) }, "Department approvers fetched");
-          for (const approver of approvers) {
-            if (approver.email) {
-              const emailTemplate = await newBookingRequestEmailTemplate(booking, approver, department.name, config.frontendLoginUrl);
-              logger.info({ to: approver.email, subject: emailTemplate.subject }, "Attempting to send email to approver");
-              await sendEmail({
-                to: approver.email,
-                subject: emailTemplate.subject,
-                html: emailTemplate.html,
-                text: emailTemplate.text,
-              });
-              logger.info({ to: approver.email }, "Email sent to approver");
+      
+      if (booking.bookingType === BookingType.OFFICIAL) {
+        // Send email notification to Department Approver
+        try {
+          if (booking.department_id) {
+            const department = await storage.getDepartment(booking.department_id);
+            logger.info({ department }, "Department fetched for booking");
+            if (department) {
+              const approvers = await storage.getDepartmentApprovers(department.id);
+              logger.info({ approversCount: approvers.length, approvers: approvers.map(a => a.email) }, "Department approvers fetched");
+              for (const approver of approvers) {
+                if (approver.email) {
+                  const emailTemplate = await newBookingRequestEmailTemplate(booking, approver, department.name, config.frontendLoginUrl);
+                  logger.info({ to: approver.email, subject: emailTemplate.subject }, "Attempting to send email to approver");
+                  await sendEmail({
+                    to: approver.email,
+                    subject: emailTemplate.subject,
+                    html: emailTemplate.html,
+                    text: emailTemplate.text,
+                  });
+                  logger.info({ to: approver.email }, "Email sent to approver");
+                }
+              }
             }
           }
+        } catch (emailError) {
+          logger.error({ err: emailError }, `Failed to send email to Department Approver for new booking ${booking.id}`);
         }
-      } catch (emailError) {
-        logger.error({ err: emailError }, `Failed to send email to Department Approver for new booking ${booking.id}`);
+      } else if (booking.bookingType === BookingType.PERSONAL) {
+        // For Personal bookings, notify VFast team immediately for allocation
+        try {
+          const vfastUsers = await storage.getUsersByRole(UserRole.VFAST);
+          for (const vfastUser of vfastUsers) {
+             if (vfastUser.email) {
+               const emailTemplate = await bookingForAllocationEmailTemplate(booking, config.frontendLoginUrl);
+               await sendEmail({
+                 to: vfastUser.email,
+                 subject: `[Personal Booking] ${emailTemplate.subject}`,
+                 html: emailTemplate.html,
+                 text: emailTemplate.text,
+               });
+             }
+          }
+        } catch (emailError) {
+          logger.error({ err: emailError }, `Failed to send email to VFast team for personal booking ${booking.id}`);
+        }
       }
 
       // Send booking created email to the requestor
@@ -1114,11 +1155,12 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       
       res.json(booking);
     } catch (error) {
+      console.error("Error in /api/bookings/:id/allocate:", error);
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
       }
-      res.status(500).json({ message: "Failed to allocate room" });
+      res.status(500).json({ message: "Failed to allocate room", error: (error as Error).message });
     }
   });
 
