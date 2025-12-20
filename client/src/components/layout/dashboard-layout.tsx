@@ -170,8 +170,8 @@ export default function DashboardLayout({
         <div className="flex flex-col flex-grow border-r border-gray-200 bg-white pt-5 pb-4 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4">
             <img
-              className="h-8 w-auto"
-              src="https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/BITS_Pilani-Logo.svg/1200px-BITS_Pilani-Logo.svg.png"
+              className="h-8 w-auto bg-white p-0.5 rounded-sm"
+              src="/images/bits-logo.jpg"
               alt="BITS Pilani"
             />
             <span className="ml-2 text-xl font-semibold text-gray-900">VFast Hostel</span>
@@ -202,8 +202,8 @@ export default function DashboardLayout({
                 </Link>
               ))}
               <div className="pt-4 mt-4 border-t border-gray-200">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
                   onClick={() => logoutMutation.mutate()}
                 >
@@ -222,14 +222,14 @@ export default function DashboardLayout({
         <div className="sticky top-0 z-10 md:hidden flex items-center justify-between px-4 py-2 bg-white shadow-sm">
           <div className="flex items-center">
             <img
-              className="h-8 w-auto"
-              src="https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/BITS_Pilani-Logo.svg/1200px-BITS_Pilani-Logo.svg.png"
+              className="h-8 w-auto bg-white p-0.5 rounded-sm"
+              src="/images/bits-logo.jpg"
               alt="BITS Pilani"
             />
             <span className="ml-2 text-xl font-semibold text-gray-900">VFast Hostel</span>
           </div>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => logoutMutation.mutate()}
           >

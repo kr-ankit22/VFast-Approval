@@ -9,38 +9,38 @@ import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, UploadCloud, PlusCircle, Edit, Trash2, Search, Users, Building2 } from "lucide-react";
 import { User, UserRole } from "@shared/schema";
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
 } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
-import { 
-  Form, 
-  FormControl, 
-  FormDescription, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from "@/components/ui/form";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -92,8 +92,8 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch all users
-  const { data: users, isLoading, error } = useQuery<User[]>({ 
-    queryKey: ["adminUsers"], 
+  const { data: users, isLoading, error } = useQuery<User[]>({
+    queryKey: ["adminUsers"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/users");
       return res.json();
@@ -112,8 +112,8 @@ export default function UserManagementPage() {
   }, {} as Record<number, string>);
 
   // Fetch user metrics
-  const { data: userMetrics, isLoading: isLoadingMetrics } = useQuery<{ totalUsers: number; totalDepartments: number }>({ 
-    queryKey: ["userMetrics"], 
+  const { data: userMetrics, isLoading: isLoadingMetrics } = useQuery<{ totalUsers: number; totalDepartments: number }>({
+    queryKey: ["userMetrics"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/stats/users");
       return res.json();
@@ -131,7 +131,7 @@ export default function UserManagementPage() {
     onSuccess: (data) => {
       toast({
         title: "Upload Successful",
-        description: `Created ${data.created} users, updated ${data.updated} users.`, 
+        description: `Created ${data.created} users, updated ${data.updated} users.`,
       });
       setFile(null);
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
@@ -217,10 +217,10 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     if (editingUser) {
-      userForm.reset({ 
-        name: editingUser.name, 
-        email: editingUser.email, 
-        role: editingUser.role, 
+      userForm.reset({
+        name: editingUser.name,
+        email: editingUser.email,
+        role: editingUser.role,
         phone: editingUser.mobileNumber || "",
         department: editingUser.department_id?.toString() || "",
         password: "",
@@ -272,7 +272,7 @@ export default function UserManagementPage() {
     }
   };
 
-  const filteredUsers = users?.filter(user => 
+  const filteredUsers = users?.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
@@ -342,93 +342,93 @@ export default function UserManagementPage() {
                   <ScrollArea className="h-full">
                     <TooltipProvider>
                       <Form {...userForm}>
-                      <form onSubmit={userForm.handleSubmit(onUserFormSubmit)} className="space-y-4 pr-6">
-                        <FormField
-                          control={userForm.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="John Doe" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={userForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input placeholder="john.doe@example.com" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={userForm.control}
-                          name="authMethod"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Authentication Method</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <form onSubmit={userForm.handleSubmit(onUserFormSubmit)} className="space-y-4 pr-6">
+                          <FormField
+                            control={userForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
                                 <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select an authentication method" />
-                                  </SelectTrigger>
+                                  <Input placeholder="John Doe" {...field} />
                                 </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Password">Password</SelectItem>
-                                  <SelectItem value="Google">Google</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="john.doe@example.com" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="authMethod"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Authentication Method</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select an authentication method" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Password">Password</SelectItem>
+                                    <SelectItem value="Google">Google</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {userForm.watch("authMethod") === "Password" && (
+                            <>
+                              <FormField
+                                control={userForm.control}
+                                name="password"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Password</FormLabel>
+                                    <FormControl>
+                                      <Input type="password" placeholder="••••••••" {...field} />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={userForm.control}
+                                name="confirmPassword"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Confirm Password</FormLabel>
+                                    <FormControl>
+                                      <Input type="password" placeholder="••••••••" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </>
                           )}
-                        />
-                        {userForm.watch("authMethod") === "Password" && (
-                          <>
-                            <FormField
-                              control={userForm.control}
-                              name="password"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Password</FormLabel>
-                                  <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                  </FormControl>
-                                  <FormDescription>
-                                    {editingUser ? "Leave blank to keep current password." : "Minimum 6 characters."}
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={userForm.control}
-                              name="confirmPassword"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Confirm Password</FormLabel>
-                                  <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-                        <FormField
-                          control={userForm.control}
-                          name="role"
-                          render={({ field }) => (
-                                                      <FormItem>
-                            <div className="flex items-center space-x-1">
+                          <FormField
+                            control={userForm.control}
+                            name="role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <div className="flex items-center space-x-1">
                                   <FormLabel>Role</FormLabel>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -442,29 +442,29 @@ export default function UserManagementPage() {
                                     </TooltipContent>
                                   </Tooltip>
                                 </div>
-                            <FormControl>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Object.values(UserRole).map((role) => (
-                                    <SelectItem key={role} value={role}>
-                                      {role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={userForm.control}
-                          name="department"
-                          render={({ field }) => (
-                          <FormItem className="flex flex-col">
+                                <FormControl>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select a role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Object.values(UserRole).map((role) => (
+                                        <SelectItem key={role} value={role}>
+                                          {role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="department"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
                                 <div className="flex items-center space-x-1">
                                   <FormLabel>Department</FormLabel>
                                   <Tooltip>
@@ -477,41 +477,41 @@ export default function UserManagementPage() {
                                     </TooltipContent>
                                   </Tooltip>
                                 </div>
-                            <FormControl>
-                              <Combobox
-                                options={departmentOptions}
-                                value={field.value}
-                                onChange={field.onChange}
-                                placeholder="Select department..."
-                                searchPlaceholder="Search departments..."
-                                noResultsMessage={isLoadingDepartments ? "Loading..." : "No departments found."}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={userForm.control}
-                          name="phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone (Optional)</FormLabel>
-                              <FormControl>
-                                <Input placeholder="+91 12345 67890" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <DialogFooter className="pt-4">
-                          <Button type="submit" disabled={userMutation.isPending}>
-                            {userMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {editingUser ? "Save Changes" : "Create User"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </Form>
+                                <FormControl>
+                                  <Combobox
+                                    options={departmentOptions}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    placeholder="Select department..."
+                                    searchPlaceholder="Search departments..."
+                                    noResultsMessage={isLoadingDepartments ? "Loading..." : "No departments found."}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="+91 12345 67890" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter className="pt-4">
+                            <Button type="submit" disabled={userMutation.isPending}>
+                              {userMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              {editingUser ? "Save Changes" : "Create User"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
                     </TooltipProvider>
                   </ScrollArea>
                 </DialogContent>
@@ -535,9 +535,9 @@ export default function UserManagementPage() {
               {searchTerm && (
                 <p className="mt-2">
                   Try a different search term or clear the search.
-                  <Button 
-                    variant="link" 
-                    className="ml-1 p-0" 
+                  <Button
+                    variant="link"
+                    className="ml-1 p-0"
                     onClick={() => setSearchTerm("")}
                   >
                     Clear search
@@ -603,7 +603,7 @@ export default function UserManagementPage() {
                   <p>Expected columns: `email`, `role`, `department`, `name` (optional), `phone` (optional).</p>
                   <p>Roles: BOOKING, DEPARTMENT_APPROVER, ADMIN, VFAST.</p>
                   <p>Department: Mandatory, must be the numerical ID of the department.</p>
-                  <p>Example: `john.doe@bits.ac.in,BOOKING,1,John Doe,+919876543210`</p>
+                  <p>Example: `john.doe@pilani.bits-pilani.ac.in,BOOKING,1,John Doe,+919876543210`</p>
                 </TooltipContent>
               </Tooltip>
             </div>

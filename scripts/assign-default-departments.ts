@@ -21,14 +21,14 @@ async function assignDefaultDepartments() {
     // 2. Update the admin user
     const adminUpdateResult = await db.update(users)
       .set({ department_id: adminDept.id })
-      .where(eq(users.email, 'admin@bits.ac.in'));
-      
+      .where(eq(users.email, 'admin@pilani.bits-pilani.ac.in'));
+
     console.log('Admin user updated.');
 
     // 3. Update the vfast user
     const vfastUpdateResult = await db.update(users)
       .set({ department_id: vfastDept.id })
-      .where(eq(users.email, 'vfast@bits.ac.in'));
+      .where(eq(users.email, 'vfast@pilani.bits-pilani.ac.in'));
 
     console.log('VFAST user updated.');
 

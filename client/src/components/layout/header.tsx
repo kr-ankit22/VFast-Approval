@@ -18,11 +18,15 @@ export default function Header() {
     <header className="bg-primary">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
-          <div className="flex items-center">
-            <Link href="/">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
+              <img
+                src="/images/bits-logo.jpg"
+                alt="BITS Pilani Logo"
+                className="h-10 w-auto bg-white p-1 rounded-sm shadow-sm"
+              />
               <h1 className="text-white text-2xl font-bold font-poppins cursor-pointer">VFast Hostel</h1>
             </Link>
-            <span className="text-white text-sm ml-2 px-2 py-1 bg-secondary text-primary rounded-md">BITS Pilani</span>
           </div>
           <div className="hidden md:flex items-center space-x-4">
             <Link href="/">
@@ -34,7 +38,7 @@ export default function Header() {
             <Link href="/#about">
               <span className="nav-link">About</span>
             </Link>
-            
+
             {!user ? (
               <Link href="/auth">
                 <Button variant="secondary" className="font-medium">Sign In</Button>
@@ -43,14 +47,14 @@ export default function Header() {
               <div className="flex items-center space-x-4">
                 <Link href={
                   user.role === UserRole.BOOKING ? "/booking" :
-                  user.role === UserRole.ADMIN ? "/admin" :
-                  "/vfast"
+                    user.role === UserRole.ADMIN ? "/admin" :
+                      "/vfast"
                 }>
                   <Button variant="ghost" className="text-white hover:text-white hover:bg-primary-foreground">
                     Dashboard
                   </Button>
                 </Link>
-                <Button 
+                <Button
                   variant="secondary"
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
@@ -67,7 +71,7 @@ export default function Header() {
           </div>
         </div>
       </div>
-      
+
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-primary pb-4">
@@ -81,7 +85,7 @@ export default function Header() {
             <Link href="/#about">
               <span className="nav-link block" onClick={() => setIsMenuOpen(false)}>About</span>
             </Link>
-            
+
             {!user ? (
               <Link href="/auth">
                 <Button variant="secondary" className="w-full mt-3" onClick={() => setIsMenuOpen(false)}>
@@ -92,12 +96,12 @@ export default function Header() {
               <>
                 <Link href={
                   user.role === UserRole.BOOKING ? "/booking" :
-                  user.role === UserRole.ADMIN ? "/admin" :
-                  "/vfast"
+                    user.role === UserRole.ADMIN ? "/admin" :
+                      "/vfast"
                 }>
                   <span className="nav-link block" onClick={() => setIsMenuOpen(false)}>Dashboard</span>
                 </Link>
-                <Button 
+                <Button
                   variant="secondary"
                   className="w-full mt-3"
                   onClick={() => {

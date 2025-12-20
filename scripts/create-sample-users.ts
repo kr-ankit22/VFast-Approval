@@ -39,11 +39,11 @@ async function createSampleUsers() {
     const password = "password123";
     const hashedPassword = await hashPassword(password);
 
-    await createOrUpdateUser("student@bits.ac.in", "BITS Student", UserRole.BOOKING, hashedPassword, 1);
-    await createOrUpdateUser("admin@bits.ac.in", "BITS Admin", UserRole.ADMIN, hashedPassword);
-    await createOrUpdateUser("vfast@bits.ac.in", "VFast Manager", UserRole.VFAST, hashedPassword);
-    await createOrUpdateUser("approver@bits.ac.in", "Department Approver", UserRole.DEPARTMENT_APPROVER, hashedPassword, 1);
-    
+    await createOrUpdateUser("student@pilani.bits-pilani.ac.in", "BITS Student", UserRole.BOOKING, hashedPassword, 1);
+    await createOrUpdateUser("admin@pilani.bits-pilani.ac.in", "BITS Admin", UserRole.ADMIN, hashedPassword);
+    await createOrUpdateUser("vfast@pilani.bits-pilani.ac.in", "VFast Manager", UserRole.VFAST, hashedPassword);
+    await createOrUpdateUser("approver@pilani.bits-pilani.ac.in", "Department Approver", UserRole.DEPARTMENT_APPROVER, hashedPassword, 1);
+
     console.log("Successfully created/updated all sample users!");
   } catch (error) {
     console.error("Error creating sample users:", error);

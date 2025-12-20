@@ -5,12 +5,12 @@ import bcrypt from 'bcrypt';
 import { sendEmail } from './email';
 import { welcomeEmailTemplate, newBookingRequestEmailTemplate, bookingStatusUpdateEmailTemplate, roomAllocatedEmailTemplate, bookingCreatedEmailTemplate, bookingForAllocationEmailTemplate, bookingRejectedByAdminEmailTemplate, bookingResubmittedEmailTemplate } from './email-templates';
 import { config } from '../shared/env';
-import { 
-  insertBookingSchema, 
-  departmentApprovalSchema, 
-  adminApprovalSchema, 
+import {
+  insertBookingSchema,
+  departmentApprovalSchema,
+  adminApprovalSchema,
   roomAllocationSchema,
-    InsertGuest, GuestCheckInStatus, WorkflowStage,
+  InsertGuest, GuestCheckInStatus, WorkflowStage,
   InsertRoomMaintenance, RoomMaintenanceStatus,
   UserRole,
   BookingStatus,
@@ -59,12 +59,12 @@ const checkRole = (roles: UserRole[]) => {
       console.log('Backend: checkRole - User not authenticated.');
       return res.status(401).json({ message: "Not authenticated" });
     }
-    
+
     if (!roles.includes((req.user as any).role as UserRole)) {
       console.log(`Backend: checkRole - User ${(req.user as any).id} with role ${(req.user as any).role} is NOT authorized.`);
       return res.status(403).json({ message: "Not authorized" });
     }
-    
+
     console.log(`Backend: checkRole - User ${(req.user as any).id} with role ${(req.user as any).role} IS authorized.`);
     next();
   };
@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
           return res.redirect("/login?error=" + encodeURIComponent(err.message));
         }
         if (!user) {
-  logger.warn
+          logger.warn
           return res.redirect("/login?error=" + encodeURIComponent(info.message || "Authentication failed"));
         }
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
@@ -248,16 +248,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         // Second pass: Process valid rows with new policy
         for (const row of validRows) {
           const { email, role, name, phone, department, password } = row;
-          
+
           // Rule 1: If password is provided in CSV, reject
           if (password) {
             errors.push(`Row for ${email}: Password provided in CSV. Only Google users without passwords can be bulk created.`);
             continue; // Skip this row
           }
 
-          // Rule 2 & 3: If no password, check email for Gmail
-          if (!email.endsWith('@gmail.com')) {
-            errors.push(`Row for ${email}: Non-Gmail email without a password. Only Gmail users can be bulk created without a password.`);
+          // Rule 2 & 3: If no password, check email for Institutional Domain
+          if (!email.endsWith('@pilani.bits-pilani.ac.in')) {
+            errors.push(`Row for ${email}: Non-BITS email without a password. Only BITS Pilani users can be bulk created without a password.`);
             continue; // Skip this row
           }
 
@@ -437,14 +437,14 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
   });
 
   // Bookings API
-  
+
   // Get all bookings (Admin & VFast users)
   app.get("/api/bookings", authenticateJwt, checkRole([UserRole.ADMIN, UserRole.VFAST]), async (req, res) => {
     try {
       const status = req.query.status as BookingStatus | undefined;
       const workflowStage = req.query.workflowStage as WorkflowStage | undefined;
       let bookings;
-      
+
       if (workflowStage) {
         bookings = await storage.getBookingsByWorkflowStage(workflowStage);
       } else if (status) {
@@ -452,7 +452,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       } else {
         bookings = await storage.getAllBookings();
       }
-      
+
       res.json(bookings);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch bookings" });
@@ -465,7 +465,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const status = req.query.status as BookingStatus | undefined;
       let bookings;
 
@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const bookings = await storage.getBookingsByUserIdAndStatus(req.user.id, BookingStatus.PENDING_RECONSIDERATION);
 
       res.json(bookings);
@@ -502,16 +502,16 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       const bookingId = parseInt(req.params.id);
       // console.log("GET /api/bookings/:id - bookingId:", bookingId);
       const booking = await storage.getBooking(bookingId);
-      
+
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
-      
+
       // Check if user is authenticated and authorized to view this booking
       if (req.user && req.user.role === UserRole.BOOKING && booking.userId !== req.user.id) {
         return res.status(403).json({ message: "Not authorized to view this booking" });
       }
-      
+
       res.json(booking);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -523,11 +523,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     try {
       const bookingId = parseInt(req.params.id);
       const journey = await storage.getBookingJourney(bookingId);
-      
+
       if (!journey) {
         return res.status(404).json({ message: "Booking not found" });
       }
-      
+
       res.json(journey);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking journey" });
@@ -541,9 +541,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const bookings = await storage.getBookingsByDepartment(req.user.department_id);
-      
+
       // console.log("GET /api/department-approvals - Bookings from storage:", bookings);
       res.json(bookings);
     } catch (error) {
@@ -616,7 +616,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
 
   // Create a new booking (Booking users)
   app.post("/api/bookings", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
-    
+
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -629,8 +629,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         return res.status(400).json({ message: "Department is required for official bookings" });
       }
 
-      const initialStatus = bookingType === BookingType.PERSONAL 
-        ? BookingStatus.APPROVED 
+      const initialStatus = bookingType === BookingType.PERSONAL
+        ? BookingStatus.APPROVED
         : BookingStatus.PENDING_DEPARTMENT_APPROVAL;
 
       const initialWorkflowStage = bookingType === BookingType.PERSONAL
@@ -651,7 +651,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       logger.info({ bookingId: booking.id }, "Booking successfully created in database");
 
       logger.info("Attempting to send email notifications...");
-      
+
       if (booking.bookingType === BookingType.OFFICIAL) {
         // Send email notification to Department Approver
         try {
@@ -684,15 +684,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         try {
           const vfastUsers = await storage.getUsersByRole(UserRole.VFAST);
           for (const vfastUser of vfastUsers) {
-             if (vfastUser.email) {
-               const emailTemplate = await bookingForAllocationEmailTemplate(booking, config.frontendLoginUrl);
-               await sendEmail({
-                 to: vfastUser.email,
-                 subject: `[Personal Booking] ${emailTemplate.subject}`,
-                 html: emailTemplate.html,
-                 text: emailTemplate.text,
-               });
-             }
+            if (vfastUser.email) {
+              const emailTemplate = await bookingForAllocationEmailTemplate(booking, config.frontendLoginUrl);
+              await sendEmail({
+                to: vfastUser.email,
+                subject: `[Personal Booking] ${emailTemplate.subject}`,
+                html: emailTemplate.html,
+                text: emailTemplate.text,
+              });
+            }
           }
         } catch (emailError) {
           logger.error({ err: emailError }, `Failed to send email to VFast team for personal booking ${booking.id}`);
@@ -716,7 +716,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         logger.error({ err: emailError }, `Failed to send booking created email to requestor for booking ${booking.id}`);
       }
 
-      res.status(201).json(booking);    } catch (error) {
+      res.status(201).json(booking);
+    } catch (error) {
       if (error instanceof ZodError) {
         const validationError = fromZodError(error);
         return res.status(400).json({ message: validationError.message });
@@ -731,7 +732,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     try {
       const bookingId = parseInt(req.params.id);
       const statusData = adminApprovalSchema.parse(req.body);
-      
+
       const booking = await storage.updateBookingStatus(
         {
           id: bookingId,
@@ -741,7 +742,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         },
         req.user.role as UserRole
       );
-      
+
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
@@ -761,7 +762,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       } catch (emailError) {
         logger.error({ err: emailError }, `Failed to send email for booking ${booking.id} status update`);
       }
-      
+
       res.json(booking);
     } catch (error) {
       // logger.error("Error updating booking status:", error);
@@ -773,7 +774,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-    
+
 
   // Resubmit booking (Booking users)
   app.post("/api/bookings/:id/resubmit", authenticateJwt, checkRole([UserRole.BOOKING]), async (req, res) => {
@@ -991,7 +992,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       } else if (booking) {
         // logger.info(`Booking ${guest.bookingId} already has firstCheckedInGuestName: ${booking.firstCheckedInGuestName}`);
       }
-      
+
       await storage.updateBooking(guest.bookingId, { keyHandedOver: true });
       res.json(guest);
     } catch (error) {
@@ -1146,13 +1147,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
         roomIds: req.body.roomIds,
         notes: req.body.notes
       });
-      
+
       const booking = await storage.allocateMultipleRooms(bookingId, roomIds, notes);
-      
+
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
-      
+
       res.json(booking);
     } catch (error) {
       console.error("Error in /api/bookings/:id/allocate:", error);
@@ -1193,7 +1194,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.status(500).json({ message: "Failed to fetch approved bookings", error: error.message });
     }
   });
-  
+
   // Get reconsideration requests (for VFast review)
   app.get("/api/bookings/reconsideration", authenticateJwt, checkRole([UserRole.VFAST]), async (req, res) => {
     // logger.info("Backend: /api/bookings/reconsideration route handler entered.");
@@ -1207,10 +1208,10 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-  
+
 
   // Rooms API
-  
+
   // Get all rooms
   app.get("/api/rooms", async (req, res) => {
     try {
@@ -1254,7 +1255,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
       res.status(500).json({ message: "Failed to fetch department" });
     }
   });
-  
+
   // Get available rooms by type
   app.get("/api/rooms/available/:type", async (req, res) => {
     try {
@@ -1386,11 +1387,11 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     try {
       const userId = parseInt(req.params.id);
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
@@ -1487,5 +1488,5 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<v
     }
   });
 
-  
+
 }

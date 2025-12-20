@@ -13,6 +13,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -40,6 +50,9 @@ const bookingFormSchema = insertBookingSchema.extend({
   checkInDate: z.date(),
   checkOutDate: z.date(),
   numberOfRooms: z.coerce.number().min(1, "At least one room is required").max(MAX_ROOMS_PER_BOOKING, `You can book a maximum of ${MAX_ROOMS_PER_BOOKING} rooms`),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "You must accept the terms and conditions"
+  }),
 }).omit({ userId: true });
 
 type FormValues = z.infer<typeof bookingFormSchema>;
@@ -68,6 +81,7 @@ export default function CreateBooking() {
     department_id: undefined,
     checkInDate: undefined,
     checkOutDate: undefined,
+    acceptTerms: false,
   };
 
   const form = useForm<FormValues>({
@@ -354,8 +368,87 @@ export default function CreateBooking() {
               )}
             />
 
-            <Button type="submit" disabled={createBookingMutation.isPending}>
-              {createBookingMutation.isPending ? "Submitting..." : "Submit Booking Request"}
+            <FormField
+              control={form.control}
+              name="acceptTerms"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      I agree to the <Dialog>
+                        <DialogTrigger asChild>
+                          <span className="text-primary underline cursor-pointer hover:text-primary/80 font-medium">conditions apply</span>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <DialogHeader>
+                            <DialogTitle className="text-xl font-bold text-primary">VFast Booking Rules & Conduct</DialogTitle>
+                            <DialogDescription>
+                              Please review the stay guidelines before proceeding.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ScrollArea className="h-[400px] mt-4 pr-4">
+                            <div className="space-y-6 text-sm">
+                              <section>
+                                <h4 className="font-bold text-primary mb-2">Guest Conduct & Responsibility</h4>
+                                <ul className="list-disc pl-4 space-y-1 text-gray-600">
+                                  <li>The host/requester is responsible for the conduct of their guests.</li>
+                                  <li>Any damage to property or loss of items will be charged to the requester.</li>
+                                  <li>Quiet hours must be observed between 10:00 PM and 7:00 AM.</li>
+                                  <li>Guests are expected to maintain decorum and respect the campus environment.</li>
+                                </ul>
+                              </section>
+
+                              <section>
+                                <h4 className="font-bold text-primary mb-2">Eco-Friendly & Green Campus</h4>
+                                <ul className="list-disc pl-4 space-y-1 text-gray-600">
+                                  <li>Switch off all electrical appliances (lights, AC, geysers) when leaving the room.</li>
+                                  <li>Conserve water and avoid littering on campus.</li>
+                                  <li>Plastic-free campus guidelines must be followed.</li>
+                                </ul>
+                              </section>
+
+                              <section>
+                                <h4 className="font-bold text-primary mb-2">Prohibited Activities</h4>
+                                <ul className="list-disc pl-4 space-y-1 text-gray-600 font-medium text-red-600">
+                                  <li>Strictly NO Smoking or Alcohol consumption.</li>
+                                  <li>No pets allowed.</li>
+                                  <li>No outside eatables in the dining area.</li>
+                                  <li>Commercial activities or unauthorized gatherings.</li>
+                                </ul>
+                              </section>
+
+                              <section>
+                                <h4 className="font-bold text-primary mb-2">Dining & Services</h4>
+                                <ul className="list-disc pl-4 space-y-1 text-gray-600">
+                                  <li>Pure Vegetarian meals only.</li>
+                                  <li>Adhere to specified dining timings.</li>
+                                  <li>Laundry and room service requests follow the hostel schedule.</li>
+                                </ul>
+                              </section>
+                            </div>
+                          </ScrollArea>
+                        </DialogContent>
+                      </Dialog>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" disabled={createBookingMutation.isPending} className="w-full md:w-auto px-8">
+              {createBookingMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting Request...
+                </>
+              ) : "Submit Booking Request"}
             </Button>
           </form>
         </Form>

@@ -6,11 +6,15 @@ export default function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-lg font-semibold font-poppins mb-4">VFast Hostel</h3>
-            <p className="text-gray-300 text-sm">
+            <img
+              src="/images/bits-logo.jpg"
+              alt="BITS Pilani Logo"
+              className="h-12 w-auto mb-4 bg-white p-1 rounded-sm shadow-sm"
+            />
+            <h3 className="text-lg font-semibold font-poppins mb-2 text-secondary">VFast Hostel</h3>
+            <p className="text-gray-300 text-sm leading-relaxed">
               Birla Institute of Technology and Science, Pilani<br />
-              Vidya Vihar, Pilani<br />
-              Rajasthan 333031, India
+              Vidya Vihar, Pilani<br /> Rajasthan 333031, India
             </p>
           </div>
           <div>
